@@ -1,41 +1,56 @@
 # Endpoints — inventaris en status
 
-| # | Endpoint | Bron | Status | Auth |
-|---|---|---|---|---|
-| 1 | `GET /test-scenarios` | Stoplight "retrieve all test scenarios" | officieel | Bearer |
-| 2 | `GET /test-scenarios/{id}` | Stoplight "get a test scenario" | officieel | Bearer |
-| 3 | `GET /test-scenarios/{id}/test-cases` | Stoplight "scenario-testcase" | officieel | Bearer |
-| 4 | `POST /test-runs/{run_id}/scenarios` | — | **TBD** (vermoedelijk officieel) | Bearer? |
-| 5 | `POST /test-runs/{run_id}/test-cases` | — | **TBD** | Bearer? |
-| 6 | `PATCH /test-runs/{run_id}/test-cases/{id}` | — | **TBD** | Bearer? |
-| 7 | `DELETE /test-runs/{run_id}/test-cases/{id}` | — | **TBD** | Bearer? |
-| 8 | `POST /testrun/listtestscenariostoadd` | DevTools (UI) | UI-only | sessie (PHPSESSID) |
-| 9 | `POST /testrun/get-testscenarios-testcases-rows` | DevTools (UI) | UI-only | sessie (PHPSESSID) |
+## Twee oppervlakken
 
-## Base URLs
-
-| Soort | URL | Wanneer gebruiken |
+| Soort | Base URL | Voorbeeld |
 |---|---|---|
-| Officiële API | `https://{{customer}}.testersuite.nl.api.testersuite.com` | endpoints 1–7 (Bearer) |
-| UI | `https://superp.testersuite.nl/{{customer_id}}/` | endpoints 8–9 (alleen als 4–7 niet bestaan) |
+| Officiële API (Bearer) | `https://{customer}.testersuite.nl.api.testersuite.com` | `https://superp.testersuite.nl.api.testersuite.com` |
+| UI / web-app (sessie) | `https://{customer}.testersuite.nl/{customer_id}` | `https://superp.testersuite.nl/1` |
 
-**Patroon:** de officiële API hangt onder `api.testersuite.com` met de
-klant-subdomein als prefix. Voorbeeld: `https://superp.testersuite.nl.api.testersuite.com`.
-De resource-paden onder die base staan in de [Stoplight-docs](https://stoplight.io/) —
-zie [open-questions](open-questions.md) punt 2 voor wat ik nog moet uitvinden over
-de testrun-endpoints.
+## Officiële API — gedocumenteerd op Stoplight
 
-## Auth
+| Endpoint | Stoplight-slug | Gebruikt voor |
+|---|---|---|
+| `GET /test-scenarios` (retrieve all) | `c8e3fae5e8e81-retrieve-all` | lijst alle SCE's, filter op `code` |
+| `GET /test-scenarios/{id}` | `154d1c8cdb722-get-a-test-scenario` | één SCE ophalen |
+| `… test-scenario-test-case` | `c65d7cb23d459-test-scenario-test-case` | testcases binnen een SCE |
+| `… test-scenario` (collection) | `273a0d26ebfde-test-scenario` | CRUD op SCE-resource |
 
-- **Bearer**: `Authorization: Bearer <token>` — voor de officiële API.
-- **Sessie**: `Cookie: PHPSESSID=…` — alleen UI-endpoints. Verkrijgen via login-flow, niet geschikt voor gescripte Tosca-runs zonder extra werk.
+Exacte paths, query-parameters en response-schemas komen uit de Stoplight-
+pagina's — die zijn gated (login-required), dus ik kan ze niet automatisch
+inlezen. Plak de relevante "Request" en "Response"-secties in
+[open-questions.md](open-questions.md#stoplight-bodies) en ik vul ze in.
 
-## Beslisboom
+## UI-endpoints — vastgelegd via DevTools
+
+URL-patroon:
 
 ```
-Bestaan endpoint 4–7 officieel?
-├─ Ja  → alles via Bearer, klaar.
-├─ Nee → endpoints 8–9 (UI) gebruiken
-│         └─ Bearer werkt daar niet → sessie-login flow toevoegen aan builder
-└─ Onbekend → eerst Stoplight checken (zie open-questions.md)
+https://{customer}.testersuite.nl/{customer_id}/testcycle/{cycle_id}/testrun/{run_id}/{action}
+```
+
+| Action | Method | Doel | Status |
+|---|---|---|---|
+| `listtestscenariostoadd` | POST | lijst SCE's die nog aan testrun toegevoegd kunnen worden | ✅ vangst aanwezig |
+| `get-testscenarios-testcases-rows` | POST | lijst CAS's die al in de testrun zitten, gegroepeerd per SCE | ✅ vangst aanwezig |
+| `{add-action}` | POST | losse testcase toevoegen aan testrun via scenario | ⏳ vangst nodig |
+| `{update-result-action}` | POST/PATCH | resultaat van een testcase in de testrun updaten | ⏳ vangst nodig |
+
+`Content-Type` van de UI-calls is `application/x-www-form-urlencoded`,
+geen JSON. Response is wel `application/json`.
+
+Zie [devtools-capture-guide.md](devtools-capture-guide.md) voor hoe je de
+twee ⏳ vangsten maakt.
+
+## Bekende voorbeeld-IDs (uit jouw vangst)
+
+- `customer` = `superp`
+- `customer_id` = `1`
+- `cycle_id` = `2`
+- `run_id` = `2`
+
+Voorbeeld-URL die werkt in jouw account:
+
+```
+POST https://superp.testersuite.nl/1/testcycle/2/testrun/2/listtestscenariostoadd
 ```

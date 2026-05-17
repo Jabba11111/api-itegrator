@@ -2,20 +2,23 @@
 
 Volgorde = wat Tosca tijdens een testrun nodig heeft.
 
-In alle voorbeelden:
+Notatie:
 
-- `{{base_url}}` = `https://{customer}.testersuite.nl.api.testersuite.com`
-  (vervang `{customer}` door je eigen subdomein, bv. `superp`)
-- `{{token}}` = Bearer access token
-- `{{cycle_id}}`, `{{run_id}}` = numerieke IDs van de testcyclus en de testrun
+- `{{api_base}}` = officiële Bearer-API base, bv. `https://superp.testersuite.nl.api.testersuite.com`
+- `{{ui_base}}` = UI-base, bv. `https://superp.testersuite.nl/1` (`1` = `customer_id`)
+- `{{cycle_id}}`, `{{run_id}}` = numerieke IDs (bv. `2` en `2`)
+- `{{token}}` = Bearer token (alleen voor `api_base`)
+
+Auth wordt door jou geleverd — deze docs beschrijven alleen de request-shape.
 
 ---
 
-## 1. Lookup SCE-code → scenario-id
+## 1. Lookup SCE-code → scenario-id  *(Bearer)*
 
-**Doel:** vertaal een SCE-code (bv. `SCE001`) naar het interne `scenario_id`.
+**Doel:** vertaal `SCE001` naar het interne `scenario_id`.
 
-**Endpoint:** `GET {{base_url}}/test-scenarios?code={{sce_code}}` *(TBD bevestigen)*
+**Endpoint:** `GET {{api_base}}/test-scenarios?code={{sce_code}}` *(exacte
+query-key volgens Stoplight bevestigen; alternatief: `?filter[code]=…`)*
 
 **Headers:**
 
@@ -24,96 +27,94 @@ Authorization: Bearer {{token}}
 Accept: application/json
 ```
 
-**Response (verwacht):**
-
-```json
-{ "data": [ { "id": 123, "code": "SCE001", "name": "..." } ] }
-```
-
-**Doorgeven aan volgende call:** `data[0].id` → `{{scenario_id}}`
+**Doorgeven:** `data[0].id` → `{{scenario_id}}`.
 
 ---
 
-## 2. Lookup CAS-code → testcase-id
+## 2. Lookup CAS-code → testcase-id  *(Bearer)*
 
-**Doel:** binnen een scenario, vertaal een CAS-code (bv. `CAS042`) naar `testcase_id`.
+**Doel:** binnen een scenario, vertaal `CAS042` naar `testcase_id`.
 
-**Endpoint:** `GET {{base_url}}/test-scenarios/{{scenario_id}}/test-cases?code={{cas_code}}` *(TBD bevestigen)*
+**Endpoint:** `GET {{api_base}}/test-scenarios/{{scenario_id}}/test-cases?code={{cas_code}}`
+*(Stoplight-slug `c65d7cb23d459-test-scenario-test-case`, exacte path bevestigen)*
 
-**Headers:** zelfde als hierboven.
-
-**Response (verwacht):**
-
-```json
-{ "data": [ { "id": 9876, "code": "CAS042", "name": "..." } ] }
-```
-
-**Doorgeven:** `data[0].id` → `{{testcase_id}}`
+**Doorgeven:** `data[0].id` → `{{testcase_id}}`.
 
 ---
 
-## 3. Voeg scenario toe aan testrun
+## 3. Lees welke scenarios nog toegevoegd kunnen worden  *(UI)*
 
-**Doel:** alle testcases uit een SCE in één keer aan een lopende testrun koppelen.
+**Doel:** UI-keuzelijst opbouwen (debug / verkenning).
 
-**Endpoint:** `POST {{base_url}}/test-runs/{{run_id}}/scenarios` **(TBD — bestaat dit officieel?)**
+**Endpoint:**
+`POST {{ui_base}}/testcycle/{{cycle_id}}/testrun/{{run_id}}/listtestscenariostoadd`
 
-**Fallback (UI-endpoint):** `POST https://superp.testersuite.nl/{{customer_id}}/testrun/listtestscenariostoadd`
-— vereist sessie-auth (PHPSESSID), niet Bearer.
+**Headers:**
 
-**Body:**
-
-```json
-{ "scenario_id": {{scenario_id}} }
+```
+Content-Type: application/x-www-form-urlencoded; charset=UTF-8
+X-Requested-With: XMLHttpRequest
 ```
 
-**Response:** lijst van toegevoegde testcase-IDs.
+**Body:** form-urlencoded *(payload nog vast te leggen — vermoedelijk leeg
+of filter-params)*.
 
 ---
 
-## 4. Voeg losse testcase toe aan testrun via scenario
+## 4. Voeg losse testcase toe aan testrun via scenario  *(UI — vangst nodig)*
 
-**Doel:** specifieke CAS aan testrun koppelen, mét scenario-naam zichtbaar.
+**Dit is de kern-actie die Tosca nodig heeft.**
 
-**Endpoint:** `POST {{base_url}}/test-runs/{{run_id}}/test-cases` **(TBD)**
+**Endpoint:** `POST {{ui_base}}/testcycle/{{cycle_id}}/testrun/{{run_id}}/{{add-action}}`
+— **`{{add-action}}` nog te bepalen** uit
+[devtools-capture-guide.md](devtools-capture-guide.md), vangst 1.
 
-**Body:**
+**Body (verwacht, form-urlencoded):**
 
-```json
-{
-  "scenario_id": {{scenario_id}},
-  "testcase_id": {{testcase_id}}
-}
+```
+scenario_id={{scenario_id}}&testcase_id={{testcase_id}}
 ```
 
-**Response:** het aangemaakte `testrun_testcase_id` (nodig voor stap 5).
+**Response:** moet het `testrun_testcase_id` opleveren — nodig voor
+stap 5/6.
+
+**Waarom via scenario en niet los:** als je puur de `testcase_id` toevoegt
+mist het scenario-label in de testrun-weergave. Door zowel `scenario_id`
+als `testcase_id` mee te sturen wordt de SCE-naam aan de regel gekoppeld.
 
 ---
 
-## 5. Update testcase-resultaat in testrun
+## 5. Update testcase-resultaat in testrun  *(UI — vangst nodig)*
 
-**Doel:** Tosca-uitvoer (pass/fail/blocked + opmerking + duur) terugschrijven.
+**Endpoint:** `POST {{ui_base}}/testcycle/{{cycle_id}}/testrun/{{run_id}}/{{update-action}}`
+— **vangst 2** uit devtools-capture-guide.
 
-**Endpoint:** `PATCH {{base_url}}/test-runs/{{run_id}}/test-cases/{{testrun_testcase_id}}` **(TBD)**
+**Body (verwacht):**
 
-**Body:**
-
-```json
-{
-  "status": "{{status}}",
-  "comment": "{{comment}}",
-  "duration_seconds": {{duration_seconds}}
-}
+```
+testrun_testcase_id={{testrun_testcase_id}}&status={{status}}&comment={{comment}}&duration_seconds={{duration_seconds}}
 ```
 
-Toegestane `status`-waarden: `pass`, `fail`, `blocked`, `not_executed` *(TBD bevestigen)*.
+Toegestane `status`-waarden nog te bevestigen (vermoeden: `pass`, `fail`,
+`blocked`, `not_executed` of numerieke codes).
 
 ---
 
-## 6. Verwijder testcase uit testrun (rollback)
+## 6. Verwijder testcase uit testrun (rollback)  *(UI — optioneel)*
 
-**Doel:** als Tosca de case niet kon uitvoeren door een setup-fout.
+Bij setup-fout in Tosca; alleen nuttig als je niet wilt dat een mislukte
+case als "blocked" in de run blijft staan.
 
-**Endpoint:** `DELETE {{base_url}}/test-runs/{{run_id}}/test-cases/{{testrun_testcase_id}}` **(TBD)**
+Endpoint en body volgens dezelfde vangst-procedure.
 
-**Response:** `204 No Content`.
+---
+
+## Welke call hoort bij welk moment in Tosca
+
+```
+Tosca StartUp           → 1 (lookup SCE)  → 2 (lookup CAS)
+Tosca AddToRun          → 4 (add testcase via scenario)  ← onthoudt testrun_testcase_id
+Tosca uitvoer (pass)    → 5 (update result = pass)
+Tosca uitvoer (fail)    → 5 (update result = fail, comment = error)
+Tosca setup-fout        → 6 (remove)  óf  5 (update = blocked)
+```

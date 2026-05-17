@@ -1,37 +1,47 @@
 import argparse
-import json
 import shlex
 import sys
 
 from .templates import USECASES, render
 
 
-def _format_block(rendered):
-    out = []
-    out.append(f"# {rendered['title']}")
-    out.append(f"# status: {rendered['status']}")
-    out.append("")
-    out.append(f"{rendered['method']} {rendered['url']}")
-    for k, v in rendered["headers"].items():
+def _format_block(r):
+    out = [
+        f"# {r['title']}",
+        f"# surface: {r['surface']}    status: {r['status']}",
+        "",
+        f"{r['method']} {r['url']}",
+    ]
+    for k, v in r["headers"].items():
         out.append(f"{k}: {v}")
-    if rendered["body"] is not None:
+    if r["body_text"] is not None and r["body_text"] != "":
         out.append("")
-        out.append(json.dumps(rendered["body"], indent=2))
+        out.append(r["body_text"])
     out.append("")
-    out.append(f"# expected: HTTP {rendered['expected_status']}")
-    if rendered["extract"]:
-        out.append(f"# extract:  {rendered['extract']}")
+    out.append(f"# expected: HTTP {r['expected_status']}")
+    if r["extract"]:
+        out.append(f"# extract:  {r['extract']}")
     return "\n".join(out)
 
 
-def _format_curl(rendered):
-    lines = [f"curl -sS -X {rendered['method']}"]
-    for k, v in rendered["headers"].items():
+def _format_curl(r):
+    lines = [f"curl -sS -X {r['method']}"]
+    for k, v in r["headers"].items():
         lines.append(f"  -H {shlex.quote(f'{k}: {v}')}")
-    if rendered["body"] is not None:
-        lines.append(f"  --data {shlex.quote(json.dumps(rendered['body']))}")
-    lines.append(f"  {shlex.quote(rendered['url'])}")
+    if r["body_text"] is not None and r["body_text"] != "":
+        lines.append(f"  --data {shlex.quote(r['body_text'])}")
+    lines.append(f"  {shlex.quote(r['url'])}")
     return " \\\n".join(lines)
+
+
+DEFAULT_VALUES = {
+    "api_base": "https://{customer}.testersuite.nl.api.testersuite.com",
+    "ui_base": "https://{customer}.testersuite.nl/{customer_id}",
+    "token": "{{token}}",
+    "add_action": "{{add_action — vangst nodig}}",
+    "update_action": "{{update_action — vangst nodig}}",
+    "remove_action": "{{remove_action — vangst nodig}}",
+}
 
 
 def main(argv=None):
@@ -48,13 +58,10 @@ def main(argv=None):
 
     if args.list or not args.usecase:
         for key, spec in USECASES.items():
-            print(f"{key:24s} {spec['status']:8s} {spec['title']}")
+            print(f"{key:24s} [{spec['surface']:6s}] {spec['status']:30s} {spec['title']}")
         return 0
 
-    values = {
-        "base_url": "https://{customer}.testersuite.nl.api.testersuite.com",
-        "token": "{{token}}",
-    }
+    values = dict(DEFAULT_VALUES)
     for item in args.kv:
         if "=" not in item:
             print(f"bad arg (expected key=value): {item}", file=sys.stderr)

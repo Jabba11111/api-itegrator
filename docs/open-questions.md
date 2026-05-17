@@ -1,52 +1,55 @@
 # Open vragen — beantwoorden vóór ronde 2
 
-## 1. Base URL voor de officiële Bearer-API — BEANTWOORD
+## 1. Base URLs — BEANTWOORD
 
-Patroon: `https://{customer}.testersuite.nl.api.testersuite.com`
-Voorbeeld: `https://superp.testersuite.nl.api.testersuite.com`
+| Wereld | Patroon |
+|---|---|
+| Officiële API | `https://{customer}.testersuite.nl.api.testersuite.com` |
+| UI | `https://{customer}.testersuite.nl/{customer_id}` |
 
-Verwerkt als default in CLI en HTML builder.
+Voorbeeld: `customer=superp`, `customer_id=1`, `cycle_id=2`, `run_id=2`.
 
-**Sub-vraag (nog open):** zit er een versie-prefix (`/v1/`, `/api/`) tussen de
-base en de resource-paden? Dat blijkt uit de Stoplight "Servers"-sectie of uit
-één voorbeeld-request.
+Verwerkt in CLI defaults en `index.html`.
 
-## 2. Bestaan Testrun/Testresult endpoints officieel?
+**Sub-vraag (mini):** zit er een versie-prefix (`/v1/`, `/api/`) tussen
+de API-base en de resource-paden? Bij voorkeur uit Stoplight "Servers"-sectie.
 
-**Vraag:** is er een Stoplight-pagina voor:
+## 2. Stoplight-bodies <a id="stoplight-bodies"></a>
 
-- "Voeg scenario toe aan testrun"
-- "Voeg testcase toe aan testrun"
-- "Update testresultaat"
-- "Verwijder testcase uit testrun"
+De vier Stoplight-pagina's zijn voor mij gated (403 zonder login). Plak
+hieronder per pagina de "Request" + "Response"-secties, of schroef in
+[`usecases.md`](usecases.md) zelf de query-keys aan.
 
-Als ja: deel de links (of plak de URL/method/body uit Stoplight).
+**Pagina's:**
 
-**Wat ik doe per antwoord:**
+- `c8e3fae5e8e81-retrieve-all` — retrieve all test scenarios
+- `154d1c8cdb722-get-a-test-scenario` — get a test scenario
+- `c65d7cb23d459-test-scenario-test-case` — scenario↔testcase
+- `273a0d26ebfde-test-scenario` — test-scenario resource
 
-- Ja, officieel → ik werk `docs/endpoints.md` en `docs/usecases.md` bij met
-  exacte paths/bodies en `{{TBD}}` valt weg.
-- Nee, alleen UI → ik bouw in de Python CLI een sessie-login-mode bij (POST naar
-  `/login`, PHPSESSID-cookie hergebruiken). De HTML-versie krijgt dan een
-  waarschuwing dat sessie-auth in de browser CORS-issues geeft.
-- Hybride → mix van de twee.
+Specifiek nodig:
 
-## 3. Voorbeeld-IDs voor werkende curl's
+- Exacte query-key om op `code` te filteren (`?code=…` vs `?filter[code]=…`)
+- Exact path voor testcases-binnen-scenario
+- Response-veldnamen (`id` vs `scenario_id`, `data` vs `result`, etc.)
 
-**Vraag:** één echte set:
+## 3. DevTools-vangst van write-acties
 
-- `cycle_id`
-- `run_id`
-- één `SCE`-code + bijbehorend `scenario_id`
-- één `CAS`-code + bijbehorend `testcase_id`
+Twee calls die we nog niet hebben — vang ze één keer in DevTools volgens
+[`devtools-capture-guide.md`](devtools-capture-guide.md):
 
-(Geen geheimen — alleen de IDs. Een wegwerp/staging-token mag, anders zet ik
-`$TS_TOKEN` als placeholder in de curls.)
+- **Add-testcase-to-run** (klik "Toevoegen" op een CAS in een testrun)
+- **Update-result** (markeer een CAS als Passed / Failed)
 
-**Wat ik doe:** elke curl in de docs wordt een copy-paste die je in een
-staging-omgeving direct kunt draaien om de spec te valideren.
+## 4. Status-vocabulaire
 
-## 4. (klein) Status-vocabulaire
+Welke waarden accepteert Testersuite voor het resultaat van een testcase?
+Vermoeden: `pass`, `fail`, `blocked`, `not_executed`. Of zijn het
+numerieke codes (1/2/3)? Bevestigen via vangst 2.
 
-**Vraag:** welke statuswaarden accepteert Testersuite voor een testresultaat?
-Vermoeden: `pass`, `fail`, `blocked`, `not_executed`. Bevestigen of corrigeren.
+## 5. Authenticatie — door jou opgelost
+
+Jij regelt zelf hoe je een Bearer-token verkrijgt en hoe je een
+PHPSESSID-sessie krijgt voor de UI-calls. Deze repo neemt daar geen
+positie in en stopt geen auth-flow in de templates — alleen het
+`Authorization: Bearer …` header-veld voor Bearer-calls.

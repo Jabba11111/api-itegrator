@@ -5,20 +5,23 @@
 <title>Testersuite Tosca Builder</title>
 <style>
   body { font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
-         max-width: 880px; margin: 24px auto; padding: 0 16px; color: #222; }
+         max-width: 920px; margin: 24px auto; padding: 0 16px; color: #222; }
   h1 { font-size: 18px; margin: 0 0 12px; }
   label { display: block; margin: 8px 0 2px; font-size: 12px; color: #555; }
-  input, select, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px;
-                            font: inherit; border: 1px solid #ccc; border-radius: 4px; }
+  input, select { width: 100%; box-sizing: border-box; padding: 6px 8px;
+                  font: inherit; border: 1px solid #ccc; border-radius: 4px; }
   pre { background: #f5f5f5; padding: 12px; border-radius: 4px; white-space: pre-wrap;
         word-break: break-word; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
-  .status-TBD { color: #b85c00; }
-  .status-official { color: #117a36; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 3px;
+           font-size: 11px; margin-left: 6px; }
+  .badge.bearer { background: #d9eafd; color: #1558b0; }
+  .badge.ui { background: #fde4cf; color: #b85c00; }
   button { margin-top: 12px; padding: 8px 14px; font: inherit;
            background: #1a73e8; color: white; border: 0; border-radius: 4px;
            cursor: pointer; }
   button:hover { background: #1558b0; }
+  .meta { color: #888; font-size: 12px; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -28,12 +31,11 @@ puur templating.</p>
 
 <label for="usecase">Use case</label>
 <select id="usecase"></select>
+<div class="meta" id="usecase-meta"></div>
 
 <div class="grid" id="fields"></div>
 
-<label>
-  <input type="checkbox" id="withCurl" checked> ook curl-voorbeeld tonen
-</label>
+<label><input type="checkbox" id="withCurl" checked> ook curl-voorbeeld tonen</label>
 
 <button id="render">Genereer</button>
 
@@ -44,101 +46,134 @@ puur templating.</p>
 const USECASES = {
   "lookup-scenario": {
     title: "Lookup SCE-code -> scenario_id",
+    surface: "bearer",
     method: "GET",
-    url: "$base_url/test-scenarios?code=$sce_code",
+    url: "$api_base/test-scenarios?code=$sce_code",
     headers: {
       "Authorization": "Bearer $token",
       "Accept": "application/json",
     },
-    body: null,
+    body: null, body_form: null,
     expected_status: 200,
     extract: "data[0].id -> scenario_id",
-    status: "official",
-    params: ["base_url", "token", "sce_code"],
+    status: "official (query-key TBD)",
+    params: ["api_base", "token", "sce_code"],
   },
   "lookup-testcase": {
     title: "Lookup CAS-code -> testcase_id (within scenario)",
+    surface: "bearer",
     method: "GET",
-    url: "$base_url/test-scenarios/$scenario_id/test-cases?code=$cas_code",
+    url: "$api_base/test-scenarios/$scenario_id/test-cases?code=$cas_code",
     headers: {
       "Authorization": "Bearer $token",
+      "Accept": "application/json",
+    },
+    body: null, body_form: null,
+    expected_status: 200,
+    extract: "data[0].id -> testcase_id",
+    status: "official (path TBD)",
+    params: ["api_base", "token", "scenario_id", "cas_code"],
+  },
+  "list-scenarios-to-add": {
+    title: "List scenarios still addable to testrun (UI)",
+    surface: "ui",
+    method: "POST",
+    url: "$ui_base/testcycle/$cycle_id/testrun/$run_id/listtestscenariostoadd",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      "Accept": "application/json",
+    },
+    body: null, body_form: {},
+    expected_status: 200,
+    extract: "lijst met SCE's",
+    status: "captured",
+    params: ["ui_base", "cycle_id", "run_id"],
+  },
+  "list-run-testcases": {
+    title: "List testcases already in testrun, grouped by SCE (UI)",
+    surface: "ui",
+    method: "POST",
+    url: "$ui_base/testcycle/$cycle_id/testrun/$run_id/get-testscenarios-testcases-rows",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      "Accept": "application/json",
+    },
+    body: null, body_form: {},
+    expected_status: 200,
+    extract: "rows met scenario+testcase combinaties",
+    status: "captured",
+    params: ["ui_base", "cycle_id", "run_id"],
+  },
+  "add-testcase-to-run": {
+    title: "Add testcase to testrun via scenario (UI)",
+    surface: "ui",
+    method: "POST",
+    url: "$ui_base/testcycle/$cycle_id/testrun/$run_id/$add_action",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
       "Accept": "application/json",
     },
     body: null,
+    body_form: { scenario_id: "$scenario_id", testcase_id: "$testcase_id" },
     expected_status: 200,
-    extract: "data[0].id -> testcase_id",
-    status: "official",
-    params: ["base_url", "token", "scenario_id", "cas_code"],
-  },
-  "add-scenario-to-run": {
-    title: "Add scenario to testrun",
-    method: "POST",
-    url: "$base_url/test-runs/$run_id/scenarios",
-    headers: {
-      "Authorization": "Bearer $token",
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    },
-    body: { scenario_id: "$scenario_id" },
-    expected_status: 201,
-    extract: "data[].id -> testrun_testcase_ids",
-    status: "TBD",
-    params: ["base_url", "token", "run_id", "scenario_id"],
-  },
-  "add-testcase-to-run": {
-    title: "Add single testcase to testrun via scenario",
-    method: "POST",
-    url: "$base_url/test-runs/$run_id/test-cases",
-    headers: {
-      "Authorization": "Bearer $token",
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    },
-    body: { scenario_id: "$scenario_id", testcase_id: "$testcase_id" },
-    expected_status: 201,
-    extract: "data.id -> testrun_testcase_id",
-    status: "TBD",
-    params: ["base_url", "token", "run_id", "scenario_id", "testcase_id"],
+    extract: "testrun_testcase_id",
+    status: "TBD — DevTools capture nodig",
+    params: ["ui_base", "cycle_id", "run_id", "add_action",
+             "scenario_id", "testcase_id"],
   },
   "update-result": {
-    title: "Update testcase result in testrun",
-    method: "PATCH",
-    url: "$base_url/test-runs/$run_id/test-cases/$testrun_testcase_id",
+    title: "Update testcase result in testrun (UI)",
+    surface: "ui",
+    method: "POST",
+    url: "$ui_base/testcycle/$cycle_id/testrun/$run_id/$update_action",
     headers: {
-      "Authorization": "Bearer $token",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
       "Accept": "application/json",
-      "Content-Type": "application/json",
     },
-    body: {
+    body: null,
+    body_form: {
+      testrun_testcase_id: "$testrun_testcase_id",
       status: "$status",
       comment: "$comment",
       duration_seconds: "$duration_seconds",
     },
     expected_status: 200,
     extract: null,
-    status: "TBD",
-    params: ["base_url", "token", "run_id", "testrun_testcase_id",
-             "status", "comment", "duration_seconds"],
+    status: "TBD — DevTools capture nodig",
+    params: ["ui_base", "cycle_id", "run_id", "update_action",
+             "testrun_testcase_id", "status", "comment", "duration_seconds"],
   },
   "remove-testcase": {
-    title: "Remove testcase from testrun (rollback)",
-    method: "DELETE",
-    url: "$base_url/test-runs/$run_id/test-cases/$testrun_testcase_id",
+    title: "Remove testcase from testrun (UI, optional)",
+    surface: "ui",
+    method: "POST",
+    url: "$ui_base/testcycle/$cycle_id/testrun/$run_id/$remove_action",
     headers: {
-      "Authorization": "Bearer $token",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
       "Accept": "application/json",
     },
     body: null,
-    expected_status: 204,
+    body_form: { testrun_testcase_id: "$testrun_testcase_id" },
+    expected_status: 200,
     extract: null,
-    status: "TBD",
-    params: ["base_url", "token", "run_id", "testrun_testcase_id"],
+    status: "TBD — DevTools capture nodig",
+    params: ["ui_base", "cycle_id", "run_id", "remove_action",
+             "testrun_testcase_id"],
   },
 };
 
 const DEFAULTS = {
-  base_url: "https://{customer}.testersuite.nl.api.testersuite.com",
+  api_base: "https://{customer}.testersuite.nl.api.testersuite.com",
+  ui_base: "https://{customer}.testersuite.nl/{customer_id}",
   token: "{{token}}",
+  add_action: "{{add_action — vangst nodig}}",
+  update_action: "{{update_action — vangst nodig}}",
+  remove_action: "{{remove_action — vangst nodig}}",
 };
 
 function sub(value, values) {
@@ -156,16 +191,39 @@ function sub(value, values) {
   return value;
 }
 
+function urlencode(obj) {
+  return Object.entries(obj)
+    .map(([k, v]) => encodeURIComponent(k) + "=" + encodeURIComponent(v))
+    .join("&");
+}
+
+function renderUC(spec, values) {
+  const body = sub(spec.body, values);
+  const bodyForm = sub(spec.body_form, values);
+  let bodyText = null;
+  if (body !== null) {
+    bodyText = JSON.stringify(body, null, 2);
+  } else if (bodyForm !== null) {
+    bodyText = Object.keys(bodyForm).length ? urlencode(bodyForm) : "";
+  }
+  return {
+    title: spec.title, surface: spec.surface, status: spec.status,
+    method: spec.method, url: sub(spec.url, values),
+    headers: sub(spec.headers, values), bodyText,
+    expected_status: spec.expected_status, extract: spec.extract,
+  };
+}
+
 function formatBlock(r) {
-  const lines = [];
-  lines.push(`# ${r.title}`);
-  lines.push(`# status: ${r.status}`);
-  lines.push("");
-  lines.push(`${r.method} ${r.url}`);
+  const lines = [
+    `# ${r.title}`,
+    `# surface: ${r.surface}    status: ${r.status}`,
+    "",
+    `${r.method} ${r.url}`,
+  ];
   for (const [k, v] of Object.entries(r.headers)) lines.push(`${k}: ${v}`);
-  if (r.body !== null) {
-    lines.push("");
-    lines.push(JSON.stringify(r.body, null, 2));
+  if (r.bodyText !== null && r.bodyText !== "") {
+    lines.push(""); lines.push(r.bodyText);
   }
   lines.push("");
   lines.push(`# expected: HTTP ${r.expected_status}`);
@@ -174,20 +232,23 @@ function formatBlock(r) {
 }
 
 function formatCurl(r) {
-  const parts = ["curl", "-sS", "-X", r.method];
+  const parts = [`curl -sS -X ${r.method}`];
   for (const [k, v] of Object.entries(r.headers)) {
-    parts.push("-H", `'${k}: ${v}'`);
+    parts.push(`  -H '${k}: ${v}'`);
   }
-  if (r.body !== null) parts.push("--data", `'${JSON.stringify(r.body)}'`);
-  parts.push(`'${r.url}'`);
-  return parts.join(" \\\n  ");
+  if (r.bodyText !== null && r.bodyText !== "") {
+    parts.push(`  --data '${r.bodyText.replace(/'/g, "'\\''")}'`);
+  }
+  parts.push(`  '${r.url}'`);
+  return parts.join(" \\\n");
 }
 
 const select = document.getElementById("usecase");
+const meta = document.getElementById("usecase-meta");
 for (const [key, spec] of Object.entries(USECASES)) {
   const opt = document.createElement("option");
   opt.value = key;
-  opt.textContent = `${key} — ${spec.title} [${spec.status}]`;
+  opt.textContent = `${key} — ${spec.title}`;
   select.appendChild(opt);
 }
 
@@ -195,6 +256,7 @@ const fields = document.getElementById("fields");
 function buildFields() {
   fields.innerHTML = "";
   const spec = USECASES[select.value];
+  meta.innerHTML = `<span class="badge ${spec.surface}">${spec.surface}</span> ${spec.status}`;
   for (const name of spec.params) {
     const label = document.createElement("label");
     label.textContent = name;
@@ -216,15 +278,10 @@ document.getElementById("render").addEventListener("click", () => {
     const el = document.getElementById(`f_${name}`);
     values[name] = el.value || `$${name}`;
   }
-  const rendered = {
-    title: spec.title, status: spec.status, method: spec.method,
-    url: sub(spec.url, values), headers: sub(spec.headers, values),
-    body: sub(spec.body, values), expected_status: spec.expected_status,
-    extract: spec.extract,
-  };
-  let out = formatBlock(rendered);
+  const r = renderUC(spec, values);
+  let out = formatBlock(r);
   if (document.getElementById("withCurl").checked) {
-    out += "\n\n# curl:\n" + formatCurl(rendered);
+    out += "\n\n# curl:\n" + formatCurl(r);
   }
   document.getElementById("output").textContent = out;
 });

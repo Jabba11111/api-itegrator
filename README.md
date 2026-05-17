@@ -28,16 +28,20 @@ endpoint of base URL nog bevestigd moet worden. Zie
 [`docs/open-questions.md`](docs/open-questions.md) voor wat er nog beantwoord
 moet zijn vóór de tweede oplevering.
 
-## Use cases
+## Plan en use cases
 
-Volledige beschrijving in [`docs/usecases.md`](docs/usecases.md).
+Beslisplan, twee API-oppervlakken (Bearer vs UI) en flow per Tosca-stap:
+[`docs/plan.md`](docs/plan.md).
 
-1. Lookup SCE-code → scenario-id
-2. Lookup CAS-code → testcase-id (binnen een scenario)
-3. Voeg scenario toe aan testrun
-4. Voeg losse testcase toe aan testrun via scenario
-5. Update testcase-resultaat in testrun (pass/fail/blocked)
-6. Verwijder testcase uit testrun (rollback)
+Use cases met exacte request-shape: [`docs/usecases.md`](docs/usecases.md).
+
+1. Lookup SCE-code → scenario-id *(Bearer)*
+2. Lookup CAS-code → testcase-id binnen scenario *(Bearer)*
+3. Lijst van toe te voegen scenarios *(UI, captured)*
+4. Lijst van testcases in testrun *(UI, captured)*
+5. Voeg testcase toe aan testrun via scenario *(UI, vangst nodig)*
+6. Update testcase-resultaat *(UI, vangst nodig)*
+7. Verwijder testcase uit testrun *(UI, optioneel)*
 
 ## Quickstart
 
