@@ -84,7 +84,17 @@ Twee opvolgende calls.
 
 **Uit response:**
 - `Set-Cookie: PHPSESSID=<initial>` → buffer `TS_INITIAL_SESSION`
-- HTML body bevat `<input name="csrft" value="…">` → buffer `TS_LOGIN_CSRF`
+- HTML body bevat een `<form id="loginform">` met o.a.:
+  ```html
+  <input type="hidden" name="redirect" value="..." />
+  <input type="hidden" name="csrft" value="94d0abb8b308-9cee6b7f98fda603b378b5c3d66f55c94aa78df3" />
+  ```
+  → parse de `csrft` value naar buffer `TS_LOGIN_CSRF`.
+
+**Tosca-extractie:**
+
+- Regex (response body): `name="csrft"\s+value="([^"]+)"`
+- Of XPath als Tosca HTML-parsing ondersteunt: `//input[@name='csrft']/@value`
 
 ### Stap 2b — POST login
 
