@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Testersuite Tosca Builder</title>
+<style>
+  body { font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+         max-width: 880px; margin: 24px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+  label { display: block; margin: 8px 0 2px; font-size: 12px; color: #555; }
+  input, select, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px;
+                            font: inherit; border: 1px solid #ccc; border-radius: 4px; }
+  pre { background: #f5f5f5; padding: 12px; border-radius: 4px; white-space: pre-wrap;
+        word-break: break-word; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+  .status-TBD { color: #b85c00; }
+  .status-official { color: #117a36; }
+  button { margin-top: 12px; padding: 8px 14px; font: inherit;
+           background: #1a73e8; color: white; border: 0; border-radius: 4px;
+           cursor: pointer; }
+  button:hover { background: #1558b0; }
+</style>
+</head>
+<body>
+<h1>Testersuite Tosca Builder</h1>
+<p>Genereer een HTTP-blok dat je in een Tosca HTTP-module plakt. Geen netwerk-call,
+puur templating.</p>
+
+<label for="usecase">Use case</label>
+<select id="usecase"></select>
+
+<div class="grid" id="fields"></div>
+
+<label>
+  <input type="checkbox" id="withCurl" checked> ook curl-voorbeeld tonen
+</label>
+
+<button id="render">Genereer</button>
+
+<h3>Resultaat</h3>
+<pre id="output">(kies een use case)</pre>
+
+<script>
+const USECASES = {
+  "lookup-scenario": {
+    title: "Lookup SCE-code -> scenario_id",
+    method: "GET",
+    url: "$base_url/test-scenarios?code=$sce_code",
+    headers: {
+      "Authorization": "Bearer $token",
+      "Accept": "application/json",
+    },
+    body: null,
+    expected_status: 200,
+    extract: "data[0].id -> scenario_id",
+    status: "official",
+    params: ["base_url", "token", "sce_code"],
+  },
+  "lookup-testcase": {
+    title: "Lookup CAS-code -> testcase_id (within scenario)",
+    method: "GET",
+    url: "$base_url/test-scenarios/$scenario_id/test-cases?code=$cas_code",
+    headers: {
+      "Authorization": "Bearer $token",
+      "Accept": "application/json",
+    },
+    body: null,
+    expected_status: 200,
+    extract: "data[0].id -> testcase_id",
+    status: "official",
+    params: ["base_url", "token", "scenario_id", "cas_code"],
+  },
+  "add-scenario-to-run": {
+    title: "Add scenario to testrun",
+    method: "POST",
+    url: "$base_url/test-runs/$run_id/scenarios",
+    headers: {
+      "Authorization": "Bearer $token",
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    },
+    body: { scenario_id: "$scenario_id" },
+    expected_status: 201,
+    extract: "data[].id -> testrun_testcase_ids",
+    status: "TBD",
+    params: ["base_url", "token", "run_id", "scenario_id"],
+  },
+  "add-testcase-to-run": {
+    title: "Add single testcase to testrun via scenario",
+    method: "POST",
+    url: "$base_url/test-runs/$run_id/test-cases",
+    headers: {
+      "Authorization": "Bearer $token",
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    },
+    body: { scenario_id: "$scenario_id", testcase_id: "$testcase_id" },
+    expected_status: 201,
+    extract: "data.id -> testrun_testcase_id",
+    status: "TBD",
+    params: ["base_url", "token", "run_id", "scenario_id", "testcase_id"],
+  },
+  "update-result": {
+    title: "Update testcase result in testrun",
+    method: "PATCH",
+    url: "$base_url/test-runs/$run_id/test-cases/$testrun_testcase_id",
+    headers: {
+      "Authorization": "Bearer $token",
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    },
+    body: {
+      status: "$status",
+      comment: "$comment",
+      duration_seconds: "$duration_seconds",
+    },
+    expected_status: 200,
+    extract: null,
+    status: "TBD",
+    params: ["base_url", "token", "run_id", "testrun_testcase_id",
+             "status", "comment", "duration_seconds"],
+  },
+  "remove-testcase": {
+    title: "Remove testcase from testrun (rollback)",
+    method: "DELETE",
+    url: "$base_url/test-runs/$run_id/test-cases/$testrun_testcase_id",
+    headers: {
+      "Authorization": "Bearer $token",
+      "Accept": "application/json",
+    },
+    body: null,
+    expected_status: 204,
+    extract: null,
+    status: "TBD",
+    params: ["base_url", "token", "run_id", "testrun_testcase_id"],
+  },
+};
+
+const DEFAULTS = {
+  base_url: "https://{customer}.testersuite.nl.api.testersuite.com",
+  token: "{{token}}",
+};
+
+function sub(value, values) {
+  if (typeof value === "string") {
+    return value.replace(/\$([a-z_][a-z0-9_]*)/gi,
+      (m, name) => Object.prototype.hasOwnProperty.call(values, name)
+        ? values[name] : m);
+  }
+  if (Array.isArray(value)) return value.map(v => sub(v, values));
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const k of Object.keys(value)) out[k] = sub(value[k], values);
+    return out;
+  }
+  return value;
+}
+
+function formatBlock(r) {
+  const lines = [];
+  lines.push(`# ${r.title}`);
+  lines.push(`# status: ${r.status}`);
+  lines.push("");
+  lines.push(`${r.method} ${r.url}`);
+  for (const [k, v] of Object.entries(r.headers)) lines.push(`${k}: ${v}`);
+  if (r.body !== null) {
+    lines.push("");
+    lines.push(JSON.stringify(r.body, null, 2));
+  }
+  lines.push("");
+  lines.push(`# expected: HTTP ${r.expected_status}`);
+  if (r.extract) lines.push(`# extract:  ${r.extract}`);
+  return lines.join("\n");
+}
+
+function formatCurl(r) {
+  const parts = ["curl", "-sS", "-X", r.method];
+  for (const [k, v] of Object.entries(r.headers)) {
+    parts.push("-H", `'${k}: ${v}'`);
+  }
+  if (r.body !== null) parts.push("--data", `'${JSON.stringify(r.body)}'`);
+  parts.push(`'${r.url}'`);
+  return parts.join(" \\\n  ");
+}
+
+const select = document.getElementById("usecase");
+for (const [key, spec] of Object.entries(USECASES)) {
+  const opt = document.createElement("option");
+  opt.value = key;
+  opt.textContent = `${key} — ${spec.title} [${spec.status}]`;
+  select.appendChild(opt);
+}
+
+const fields = document.getElementById("fields");
+function buildFields() {
+  fields.innerHTML = "";
+  const spec = USECASES[select.value];
+  for (const name of spec.params) {
+    const label = document.createElement("label");
+    label.textContent = name;
+    const input = document.createElement("input");
+    input.id = `f_${name}`;
+    input.placeholder = DEFAULTS[name] || `$${name}`;
+    if (DEFAULTS[name]) input.value = DEFAULTS[name];
+    label.appendChild(input);
+    fields.appendChild(label);
+  }
+}
+select.addEventListener("change", buildFields);
+buildFields();
+
+document.getElementById("render").addEventListener("click", () => {
+  const spec = USECASES[select.value];
+  const values = {};
+  for (const name of spec.params) {
+    const el = document.getElementById(`f_${name}`);
+    values[name] = el.value || `$${name}`;
+  }
+  const rendered = {
+    title: spec.title, status: spec.status, method: spec.method,
+    url: sub(spec.url, values), headers: sub(spec.headers, values),
+    body: sub(spec.body, values), expected_status: spec.expected_status,
+    extract: spec.extract,
+  };
+  let out = formatBlock(rendered);
+  if (document.getElementById("withCurl").checked) {
+    out += "\n\n# curl:\n" + formatCurl(rendered);
+  }
+  document.getElementById("output").textContent = out;
+});
+</script>
+</body>
+</html>
