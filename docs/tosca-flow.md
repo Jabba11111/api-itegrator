@@ -1,118 +1,91 @@
 # Tosca-flow — testcase uitvoeren en resultaat in Testersuite
 
-Hoe je in Tosca Tricentis één testcase laat lopen en het resultaat
-terugschrijft naar een lopende Testersuite-testrun.
+## Twee modellen
 
-## Aannames
+| Model | Wat Tosca doet | Wat tester handmatig doet | Geschikt voor |
+|---|---|---|---|
+| **A. Lookup + PATCH** (aanbevolen) | result wegschrijven per CAS | testrun aanmaken + scenarios/cases via UI toevoegen (geeft SCE-badge) | de meeste situaties |
+| **B. Volledig dynamisch** | scenarios én cases toevoegen aan run en daarna result wegschrijven | alleen design (cases in scenarios) bijhouden | als Tosca per-run varieert in welke cases |
 
-- Tosca Tricentis 14+ met **TBox HTTP Engine**.
-- Basic auth wordt door jou geleverd via een Tosca Buffer of vault.
-- Per Tosca-suite weet je vooraf: `TEST_CYCLE_ID` en `TEST_RUN_ID`.
+Model A gebruikt alleen officiële Bearer/Basic API + één HTML-lookup.
+Model B vereist daarnaast de UI-form-POST met sessie-auth en CSRF.
 
-## Globale Tosca-buffers
+---
 
-Definieer deze één keer (bv. in een Setup-module of als project-buffers):
+## Model A — Lookup + PATCH (aanbevolen)
 
-| Buffer | Voorbeeldwaarde |
+### Aannames
+
+- De testrun bestaat al (handmatig aangemaakt).
+- De gewenste scenarios + cases zijn handmatig via de Testersuite-UI aan
+  de run toegevoegd (geeft SCE-badge automatisch).
+- Per CAS heeft Tosca de CAS-code beschikbaar (bv. `CAS41`).
+
+### Globale Tosca-buffers
+
+| Buffer | Voorbeeld |
 |---|---|
 | `TS_API_BASE` | `https://superp.testersuite.nl.api.testersuite.com` |
+| `TS_UI_BASE` | `https://superp.testersuite.nl/1` |
 | `TS_ENV` | `1` |
-| `TS_BASIC` | `base64(user:pass)` |
-| `TS_CYCLE_ID` | `4` |
-| `TS_RUN_ID` | `2` |
+| `TS_BASIC` | `<base64(user:pass)>` |
+| `TS_RUN_ID` | `92` |
+| `TS_OK_STATUS_ID` | `?` (te bepalen, 1=notstarted en 4=notok zijn bekend) |
+| `TS_NOTOK_STATUS_ID` | `4` |
 
-Plus per testcase die Tosca uitvoert:
-
-| Buffer | Bron |
-|---|---|
-| `SCE_CODE` | testdatasheet, bv. `SCE1` |
-| `CAS_CODE` | testdatasheet, bv. `CAS2` |
-| `TOSCA_RESULT` | `ok` of `notok` (na uitvoer) |
-
-## Vijf HTTP-modules in Tosca
-
-### Module 1 — Lookup scenario (optioneel)
-
-Sla over als het `scenario_id` direct uit het testdatasheet komt.
+### Module 1 — Lijst alle trtcs in de run
 
 | Veld | Waarde |
 |---|---|
 | Method | `GET` |
-| URL | `{TS_API_BASE}/{TS_ENV}/test-scenarios?filter[testCycle]={TS_CYCLE_ID}&page[offset]=0` |
-| Header | `Authorization: Basic {TS_BASIC}` |
-| Header | `Accept: application/vnd.api+json` |
+| URL | `{TS_UI_BASE}/papi/testscenario/RUN{TS_RUN_ID}/testcases` |
+| Header | `Cookie: PHPSESSID={TS_SESSION}` |
+| Header | `X-Requested-With: XMLHttpRequest` |
 
-**Verwacht:** `200 OK`, JSON:API pagina.
+**Response:** HTML met één `<tr>` per trtc:
 
-**Naar buffer (JSONPath):**
-`$.data[?(@.attributes.businessId=='{SCE_CODE}')].id` → `SCENARIO_ID`
-
-**Pagineren:** als geen match en `links.next` aanwezig, herhaal met
-`page[offset]=10`, `20`, … (Tosca: TestStep-loop).
-
-### Module 2 — Lookup testcase
-
-| Veld | Waarde |
-|---|---|
-| Method | `GET` |
-| URL | `{TS_API_BASE}/{TS_ENV}/test-scenarios/{SCENARIO_ID}` |
-| Header | `Authorization: Basic {TS_BASIC}` |
-| Header | `Accept: application/vnd.api+json` |
-
-**Naar buffer (JSONPath):**
-`$.included[?(@.type=='testCase' && @.attributes.businessId=='{CAS_CODE}')].id` → `TESTCASE_ID`
-
-### Module 3 — Add testcase aan testrun
-
-| Veld | Waarde |
-|---|---|
-| Method | `POST` |
-| URL | `{TS_API_BASE}/{TS_ENV}/test-runs/{TS_RUN_ID}/test-cases` |
-| Header | `Authorization: Basic {TS_BASIC}` |
-| Header | `Content-Type: application/vnd.api+json` |
-| Header | `Accept: application/vnd.api+json` |
-| Body | JSON, zie hieronder |
-
-```json
-{
-  "data": {
-    "relationships": {
-      "testDesignTestCase": {
-        "data": { "id": "{TESTCASE_ID}", "type": "testCase" }
-      }
-    }
-  }
-}
+```html
+<tr databaseid="447" relationid="447" businessid="CAS41">
+    <a runsce_id="2">SCE3</a>
+    <td class="testcase-shortdescription">test voor test scenario</td>
+    ...
+</tr>
 ```
 
-**Verwacht:** `201 Created`.
-**Naar buffer:** `$.data.id` → `TRTC_ID`.
+**Parse:** voor elk `<tr>` met `databaseid` attribuut:
+- `databaseid` → `trtc_id`
+- `businessid` → CAS-code (`CAS41`)
+- (optioneel) inhoud van `<a runsce_id="…">` → SCE-tekst voor verificatie
 
-### Module 4 — (Hier voert Tosca zijn eigen test uit)
+**Buffer:** voor de CAS-code die Tosca nu uitvoert, vind de match in de lijst
+en sla `trtc_id` op.
+
+**Cache-tip:** doe Module 1 één keer bij het begin van de Tosca-batch en
+bewaar de hele mapping `CAS_CODE → trtc_id` als Tosca Data Resource.
+
+### Module 2 — Tosca eigen test
 
 Voer de geautomatiseerde acties uit. Zet aan het einde:
 
-- `TOSCA_RESULT` = `ok` of `notok`
-- Map dat naar `EXEC_STATUS_ID`:
-  - `notok` → `4`
-  - `ok` → `?` (nog vast te leggen — eenmalig met module 6 hieronder)
+- `TOSCA_RESULT` = `"ok"` of `"notok"`
+- `EXEC_STATUS_ID` = `{TS_OK_STATUS_ID}` of `{TS_NOTOK_STATUS_ID}`
 
-### Module 5 — Update resultaat
+### Module 3 — Update resultaat
 
 | Veld | Waarde |
 |---|---|
 | Method | `PATCH` |
-| URL | `{TS_API_BASE}/{TS_ENV}/test-runs/{TS_RUN_ID}/test-cases/{TRTC_ID}` |
+| URL | `{TS_API_BASE}/{TS_ENV}/test-runs/{TS_RUN_ID}/test-cases/{trtc_id}` |
 | Header | `Authorization: Basic {TS_BASIC}` |
 | Header | `Content-Type: application/vnd.api+json` |
 | Header | `Accept: application/vnd.api+json` |
-| Body | JSON, zie hieronder |
+| Body | zie hieronder |
 
 ```json
 {
   "data": {
     "type": "testRunTestCase",
-    "id": "{TRTC_ID}",
+    "id": "{trtc_id}",
     "attributes": { "status": "{TOSCA_RESULT}" },
     "relationships": {
       "executionStatus": {
@@ -123,83 +96,107 @@ Voer de geautomatiseerde acties uit. Zet aan het einde:
 }
 ```
 
-**Verwacht:** `200 OK`.
+### Volgorde
 
-### Module 6 — Read result (debug)
+```
+Eenmaal per Tosca-batch:
+  └─ Module 1: GET trtcs → cache CAS_CODE → trtc_id mapping
 
-Eenmalig nodig om de `EXEC_STATUS_ID` voor `"ok"` vast te stellen:
+Per testcase in de Tosca ExecutionList:
+  ├─ lookup trtc_id uit cache
+  ├─ Module 2: Tosca steps → TOSCA_RESULT, EXEC_STATUS_ID
+  └─ Module 3: PATCH result
+```
+
+---
+
+## Model B — Volledig dynamisch (zwaarder, alleen als nodig)
+
+Als Tosca ook scenarios + cases aan de run moet kunnen toevoegen.
+Vereist mimicry van de UI-edit-form. Zie
+[`samples/ui-edit-testrun-submit.json`](samples/ui-edit-testrun-submit.json).
+
+### Extra modules
+
+#### Module A — Haal edit-form op (voor CSRF en huidige state)
 
 | Veld | Waarde |
 |---|---|
 | Method | `GET` |
-| URL | `{TS_API_BASE}/{TS_ENV}/test-runs/{TS_RUN_ID}/test-cases/{TRTC_ID}` |
-| Header | `Authorization: Basic {TS_BASIC}` |
-| Header | `Accept: application/vnd.api+json` |
+| URL | `{TS_UI_BASE}/testcycle/{TS_CYCLE_ID}/testrun/{TS_RUN_ID}/edit` |
+| Header | `Cookie: PHPSESSID={TS_SESSION}` |
 
-Zet één case in de UI op "OK", run deze module, en lees
-`$.data.relationships.executionStatus.data.id` af.
+**Parse uit HTML:**
+- CSRF-token (uit een `<input name="csrft" value="…">` of `<meta>`)
+- Bestaande `testruntestscenariotestcases[…]` entries (loop door alle form-velden)
+- Run-metadata (naam, descriptions, dates, tester)
 
-## Volgorde in een Tosca testrun
+#### Module B — Submit met nieuwe entries
+
+| Veld | Waarde |
+|---|---|
+| Method | `POST` |
+| URL | `{TS_UI_BASE}/testcycle/{TS_CYCLE_ID}/testrun/{TS_RUN_ID}/edit` |
+| Header | `Cookie: PHPSESSID={TS_SESSION}` |
+| Header | `Content-Type: application/x-www-form-urlencoded` |
+| Header | `Origin: {TS_UI_BASE_ORIGIN}` |
+| Header | `Referer: {TS_UI_BASE}/testcycle/{TS_CYCLE_ID}/testrun/{TS_RUN_ID}/edit` |
+| Body | volledige form-body met alle bestaande velden plus nieuwe entries |
+
+**Nieuwe entry per CAS toe te voegen:**
 
 ```
-[Setup eenmaal per Tosca-batch]
-  └─ vul TS_* buffers
-
-[Per testcase in de Tosca ExecutionList]
-  ├─ Module 1: Lookup scenario  → SCENARIO_ID
-  ├─ Module 2: Lookup testcase  → TESTCASE_ID
-  ├─ Module 3: Add to run       → TRTC_ID
-  ├─ Module 4: Tosca steps      → TOSCA_RESULT
-  └─ Module 5: PATCH result
+testruntestscenariotestcases[new__<random_hex>][relationId]=
+testruntestscenariotestcases[new__<random_hex>][testscenarioId]=<design SCE-id>
+testruntestscenariotestcases[new__<random_hex>][testcaseId]=<design CAS-id>
+testruntestscenariotestcases[new__<random_hex>][testerId]=USR1
+testruntestscenariotestcases[new__<random_hex>][resetStatus]=0
 ```
 
-## Optimalisaties
+`<random_hex>` mag elke string zijn die nog niet als key gebruikt is
+binnen deze POST (bv. een uuid zonder streepjes).
 
-- **Cache de lookups.** Doe Module 1+2 één keer aan het begin voor álle
-  CAS in je batch en bewaar de mapping `CAS_CODE → TESTCASE_ID` in een
-  Tosca Data Resource. Tijdens uitvoer alleen Module 3 + 5.
-- **Idempotency.** Als Module 3 een `409 Conflict` geeft, bestaat de
-  case al in de run. Roep dan `GET /test-runs/{run}/test-cases` aan om
-  de bestaande `TRTC_ID` op te halen voor Module 5.
+**Verwacht:** `302` redirect (volg de location niet, het was succesvol).
 
-## Valkuil: drie soorten ID's door elkaar
+#### Module C — Refresh om nieuwe trtc_id te vinden
 
-Testersuite gebruikt drie verschillende numerieke ID-ruimtes. Verwar ze niet:
+Run Module 1 (uit Model A) opnieuw. Nieuwe rijen verschijnen met
+toegekende `databaseid` (= nieuwe trtc_id).
+
+### Foutgevoeligheden Model B
+
+- **CSRF rotates** per sessie en kan tijdens lange runs verlopen
+- **Sessie-cookie** (`PHPSESSID`) verloopt na inactiviteit
+- **Race-conditions** als anderen tegelijk de testrun bewerken
+- **Brittle:** bij UI-update aan Testersuite-zijde kan de form-structuur
+  veranderen → Tosca-flow breekt zonder waarschuwing
+
+---
+
+## Valkuil: vier soorten ID's
+
+Verwar ze niet:
 
 | Soort | Voorbeeld | Waar te vinden |
 |---|---|---|
-| **design testCase id** | `39`, `40` | `GET /test-scenarios/{sid}` → `included[type=testCase].id` |
-| **testRunTestCase id (trtc_id)** | `425` | `POST /test-runs/{run}/test-cases` response `data.id` |
-| **CAS-code (businessId)** | `CAS39`, `CAS2` | `attributes.businessId` op beide bovenstaande resources |
+| **design testCase id** | `41` | `included[type=testCase].id` of `[testcaseId]=41` |
+| **design testScenario id** | `3` | `[testscenarioId]=3`, of `attributes.businessId=="SCE3"` |
+| **testRunTestCase id (trtc_id)** | `447` | `databaseid="447"` in HTML, `id` in API response |
+| **testRunTestScenario id (runsce_id)** | `2` | `runsce_id="2"` in HTML (run-interne SCE-instantie) |
 
-**De Module-3-body verwacht de design id**, niet de trtc_id. Een trtc_id
-in `testDesignTestCase.data.id` zetten geeft **HTTP 404**.
+Voor PATCH gebruik je altijd `trtc_id`. Voor de UI-form-POST gebruik
+je de design IDs. `runsce_id` zie je alleen ter info.
 
-```
-testDesignTestCase.data.id  →  design testCase id (uit included[])
-                               ↑
-                               NIET de id die je terugkrijgt uit een eerdere add-call
-```
+---
 
 ## Foutafhandeling per call
 
 | HTTP-code | Betekenis | Actie |
 |---|---|---|
 | `200/201` | OK | door |
-| `400` | bad request | log body, stop run |
-| `401` | auth fout | stop run, check `TS_BASIC` |
-| `404` | resource niet gevonden | check ID-soort (design vs trtc!), log, markeer skipped |
-| `409` | al toegevoegd | lookup bestaande TRTC_ID |
+| `302` | redirect na form-submit | succes, volg location niet |
+| `400` | bad request / form-validatie | log body, stop |
+| `401/403` | auth / sessie-issue | refresh sessie of stop |
+| `404` | resource niet gevonden | check ID-soort (design vs trtc!) |
+| `409` | conflict (al toegevoegd) | gebruik bestaande trtc |
 | `5xx` | server fout | retry 2× met backoff |
-
-## Open punt: scenario-label
-
-De `testRunTestCase` heeft géén `testScenario`-relationship terug. Of
-het scenario-label automatisch in de testrun-UI verschijnt na een
-API-add, is niet uit de response af te leiden — alleen visueel te
-checken na een echte testcall. Zie open-questions.md.
-
-Als blijkt dat het label niet verschijnt: fallback naar UI-flow
-(`{ui_base}/testcycle/{cy}/testrun/{rn}/{add-action}`) met
-form-urlencoded en sessie-auth. Daarvoor is nog één DevTools-vangst
-nodig.

@@ -85,7 +85,7 @@ https://{customer}.testersuite.nl/{customer_id}/testcycle/{cycle_id}/testrun/{ru
 | `listtestscenariostoadd` | POST | popup 1: lijst SCE's die nog toegevoegd kunnen worden | ✅ vangst |
 | `get-testscenarios-testcases-rows` | POST | popup 2: lijst CAS's per gekozen SCE | ✅ vangst |
 | `papi/testscenario/RUN{run_id}/testcases` | GET | **lijst alle trtc's in run met SCE-badge** (HTML) | ✅ vangst |
-| `{add-testscenario-or-cases}` | POST | submit die scenarios+cases aan run koppelt | ⏳ vangst nodig |
+| `{add-testscenario-or-cases}` | POST | submit die scenarios+cases aan run koppelt | ✅ vangst — `POST /testcycle/{c}/testrun/{r}/edit` (volledige form-save met CSRF) |
 | `{update-action}` | POST/PATCH | resultaat updaten | (officieel mogelijk, zie boven) |
 
 Content-Type van UI-calls is `application/x-www-form-urlencoded; charset=UTF-8`.

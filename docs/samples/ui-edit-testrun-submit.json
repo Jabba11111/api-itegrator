@@ -1,0 +1,54 @@
+{
+  "_comment": "DevTools-vangst van de submit-POST die cases met scenario aan testrun 92 koppelt. Endpoint: POST /1/testcycle/1/testrun/92/edit. Content-Type: application/x-www-form-urlencoded. Result: 302 -> /1/testcycle/1/testrun/92#testcases.",
+
+  "request": {
+    "url": "https://superp.testersuite.nl/1/testcycle/1/testrun/92/edit",
+    "method": "POST",
+    "content_type": "application/x-www-form-urlencoded",
+    "auth": "PHPSESSID cookie (sessie)"
+  },
+
+  "payload_structure": {
+    "top_level": {
+      "opentab": "testcases",
+      "csrft": "<roterende CSRF token, vereist>",
+      "autoFillTesters": "1",
+      "2": "<testrun shortDescription>",
+      "3": "<testrun longDescription, escaped>",
+      "5": "",
+      "6": "",
+      "7": "<tester USR id, bv 2>",
+      "8": "<startdatum, dubbel: dd/mm/yyyy en yyyy-mm-dd>",
+      "9": "<einddatum, dubbel>",
+      "12": "0",
+      "13": "0"
+    },
+    "per_existing_trtc": {
+      "testruntestscenariotestcases[<trtc_id>][relationId]": "<trtc_id>",
+      "testruntestscenariotestcases[<trtc_id>][testscenarioTestcaseRelationIdToCopy]": "",
+      "testruntestscenariotestcases[<trtc_id>][testscenarioId]": "<design SCE-id of leeg>",
+      "testruntestscenariotestcases[<trtc_id>][testcaseId]": "<design CAS-id>",
+      "testruntestscenariotestcases[<trtc_id>][productOrRequirementId]": "",
+      "testruntestscenariotestcases[<trtc_id>][testerId]": "USR1",
+      "testruntestscenariotestcases[<trtc_id>][resetStatus]": "0"
+    },
+    "per_new_entry": {
+      "testruntestscenariotestcases[new__<random_hex>][relationId]": "",
+      "testruntestscenariotestcases[new__<random_hex>][testscenarioId]": "<design SCE-id om SCE-badge te krijgen>",
+      "testruntestscenariotestcases[new__<random_hex>][testcaseId]": "<design CAS-id>",
+      "testruntestscenariotestcases[new__<random_hex>][testerId]": "USR1",
+      "testruntestscenariotestcases[new__<random_hex>][resetStatus]": "0"
+    }
+  },
+
+  "observations": [
+    "Het is een save-of-the-entire-form, geen surgical add.",
+    "Per nieuwe entry hebben we een unieke key nodig (new__<random>). Server kent een nieuwe trtc_id toe.",
+    "testscenarioId in de form = design SCE-id (3 voor SCE3), NIET de testRunTestScenario id (runsce_id, run-interne)",
+    "CSRF-token roteert per sessie; eerst GET /edit om hem te halen, dan POST",
+    "Bestaande entries moeten MEE in de POST anders worden ze verwijderd",
+    "Response is 302 redirect; nieuwe trtc_id volgt uit een aparte GET /1/papi/testscenario/RUN{run_id}/testcases"
+  ],
+
+  "voorbeeld_van_user_vangst": "Run 92 had 3 bestaande trtcs (425, 431, 446) en 3 nieuwe entries (447, 448, 449) werden toegevoegd, alle drie met testscenarioId=3 en testcaseId=41 (= CAS41 in SCE3)."
+}
