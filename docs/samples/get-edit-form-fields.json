@@ -1,0 +1,67 @@
+{
+  "_comment": "Werkelijke veld-mapping van het testrun edit-form, ontleed uit GET /1/testcycle/1/testrun/97/edit (superp-account).",
+
+  "request": {
+    "method": "POST",
+    "url": "https://{customer}.testersuite.nl/{customer_id}/testcycle/{cycle_id}/testrun/{run_id}/edit",
+    "content_type": "application/x-www-form-urlencoded",
+    "auth": "PHPSESSID cookie",
+    "extra_headers": {
+      "Origin": "https://{customer}.testersuite.nl",
+      "Referer": "https://{customer}.testersuite.nl/{customer_id}/testcycle/{cycle_id}/testrun/{run_id}/edit",
+      "X-Requested-With": "XMLHttpRequest (optioneel, voor AJAX-stijl)"
+    }
+  },
+
+  "form_fields_run_metadata": {
+    "csrft": "<token uit <input name=csrft>, roteert per pagina-load>",
+    "autoFillTesters": "0",
+    "2": "<shortDescription tekst>",
+    "3": "<longDescription tekst, markdown allowed>",
+    "5": "<testtype id, optional. Mapping: 1=Unittest, 2=Systeem Int. Test, 3=Gebruikers Acc. Test, 4=Productie Acc. Test>",
+    "6": "<testenvironment id, optional. Mapping: 1=Ontwikkel, 2=Test, 3=Acceptatie, 4=Productie>",
+    "7": "<status id. Mapping: 1=notstarted, 3=canceled, 4=finished>",
+    "8 (1e)": "<startDate dd/mm/yyyy>",
+    "8 (2e)": "<startDate yyyy-mm-dd>",
+    "9 (1e)": "<endDate dd/mm/yyyy>",
+    "9 (2e)": "<endDate yyyy-mm-dd>",
+    "12": "<isSequential, 0 of 1>",
+    "13": "<executeBeforeStartDateAllowed, 0 of 1>"
+  },
+
+  "form_fields_testcases_existing": {
+    "testruntestscenariotestcases[]": "",
+    "testruntestscenariotestcases[<trtc_id>][relationId]": "<trtc_id>",
+    "testruntestscenariotestcases[<trtc_id>][testscenarioTestcaseRelationIdToCopy]": "",
+    "testruntestscenariotestcases[<trtc_id>][testscenarioId]": "<design SCE-id of leeg>",
+    "testruntestscenariotestcases[<trtc_id>][testcaseId]": "<design CAS-id>",
+    "testruntestscenariotestcases[<trtc_id>][productOrRequirementId]": "",
+    "testruntestscenariotestcases[<trtc_id>][testerId]": "USR1",
+    "testruntestscenariotestcases[<trtc_id>][resetStatus]": "0"
+  },
+
+  "form_fields_testcases_new": {
+    "_comment": "<rand> = elke unieke hex-string (bv. uuid zonder streepjes)",
+    "testruntestscenariotestcases[new__<rand>][relationId]": "",
+    "testruntestscenariotestcases[new__<rand>][testscenarioTestcaseRelationIdToCopy]": "",
+    "testruntestscenariotestcases[new__<rand>][testscenarioId]": "<design SCE-id; vereist voor SCE-badge>",
+    "testruntestscenariotestcases[new__<rand>][testcaseId]": "<design CAS-id>",
+    "testruntestscenariotestcases[new__<rand>][productOrRequirementId]": "",
+    "testruntestscenariotestcases[new__<rand>][testerId]": "USR1",
+    "testruntestscenariotestcases[new__<rand>][resetStatus]": "0"
+  },
+
+  "parse_csrf_hints": {
+    "regex": "name=\"csrft\"\\s+value=\"([^\"]+)\"",
+    "xpath": "//input[@name='csrft']/@value"
+  },
+
+  "observations": [
+    "Numerieke veldnamen (2, 3, 5, 6, 7, 8, 9, 12, 13) zijn custom-fieldIDs uit de Testersuite-config van deze tenant. In een ander tenant kunnen ze afwijken.",
+    "Tosca moet eerst GET /edit doen en de mapping uit de HTML parsen voor robuustheid.",
+    "Datum-velden 8 en 9 sturen TWEE waarden met dezelfde naam: de zichtbare datepicker (dd/mm/yyyy) EN een hidden ISO-formaat (yyyy-mm-dd). Beide MEE sturen.",
+    "isSequential (12) en executeBeforeStartDate (13) hebben elk ook een hidden=0 base-waarde + een checkbox=1. Bij unchecked stuur je alleen 0 mee, bij checked stuur je BOTH 0 en 1 (browser doet dat automatisch).",
+    "JS combineert de twee forms (#edittestrun en #edittestruntestcases) tot één POST naar dezelfde URL.",
+    "Form-action is leeg ('') in HTML; browser POST naar de pagina-URL = /edit."
+  ]
+}

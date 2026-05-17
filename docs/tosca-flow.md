@@ -147,21 +147,26 @@ Cookie: {TS_SESSION}
 Accept: text/html
 ```
 
-**Parse uit HTML:**
+**Parse uit HTML** (de meest betrouwbare aanpak: parse altijd, hardcode niet,
+want veldnamen zijn tenant-specifieke custom-fieldIDs):
 
 - `<input name="csrft" value="…">` → `TS_CSRF`
-- Alle form-velden met genummerde namen (`name="2"`, `name="3"`, etc.)
-  → `TS_FORM_META` dict. Voor een **nieuw aangemaakte run** zijn dit:
-  - `2` = shortDescription (zoals in stap 1)
-  - `3` = longDescription
-  - `5`, `6` = leeg
-  - `7` = active tester USR id (bv `"2"`)
-  - `8` = startDate (dubbel: `dd/mm/yyyy` + `yyyy-mm-dd`)
-  - `9` = endDate (dubbel)
-  - `12`, `13` = `"0"`
-  - `opentab` = `"testcases"`
-  - `autoFillTesters` = `"1"`
-- `testruntestscenariotestcases[]=` (leeg, want geen entries nog)
+- `<input name="2" value="…">` → shortDescription (de echte HTML-naam kan
+  per tenant anders zijn, in superp is het `name="2"`)
+- `<textarea name="3">…</textarea>` → longDescription
+- `<select name="5">` → testtype id (optioneel)
+- `<select name="6">` → testenvironment id (optioneel)
+- `<select name="7">` → status id (`1=notstarted`, `3=canceled`, `4=finished`)
+- `<input name="8">` × 2 → startDate (dd/mm/yyyy + yyyy-mm-dd)
+- `<input name="9">` × 2 → endDate (idem)
+- `<input name="12">` × 2 → isSequential (hidden `0` + checkbox `1`)
+- `<input name="13">` × 2 → executeBeforeStartDateAllowed
+- `<input name="autoFillTesters">` → bv `"0"`
+
+Sla de **complete waarden-set** op als `TS_FORM_META` — bij de POST in
+stap 4a stuur je deze ongewijzigd terug.
+
+**Volledige veld-referentie:** [`samples/get-edit-form-fields.json`](samples/get-edit-form-fields.json)
 
 ## Stap 4a — Voeg case toe (UI form-POST)
 
