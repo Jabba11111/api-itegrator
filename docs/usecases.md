@@ -29,14 +29,9 @@ Accept: application/vnd.api+json
 
 **Response:** JSON:API lijst van `testScenario`-objecten, 10 per pagina.
 
-**Mapping SCE → id:** geen ingebouwde `code`-filter. Drie opties:
-
-1. Pagineer en match op `data[].attributes.name` of een vergelijkbaar veld
-   (welk veld dat exact is hangt af van jouw Testersuite-config — zie
-   open-questions.md).
-2. Gebruik `filter[customField_X]=SCE001` als SCE-code als custom field
-   is geconfigureerd.
-3. Sla over: laat Tosca het numerieke `scenario_id` direct kennen.
+**Mapping SCE → id:** `SCE<nr>` zit in `data[i].attributes.businessId` (bv.
+`"SCE1"`). Geen ingebouwde `filter[businessId]` — pagineren tot je een match
+op `businessId` hebt, of het `scenario_id` direct uit Tosca aandragen.
 
 ---
 
@@ -50,8 +45,14 @@ Accept: application/vnd.api+json
 **Headers:** zelfde als boven.
 
 **Response:** `data` = scenario, `included[]` bevat `testScenarioTestCase`,
-`testCase`, en `testCaseStep`-records. Filter `included[]` op
-`type==testCase` en match op `code`/`name` om `testcase_id` te vinden.
+`testCase`, en `testCaseStep`-records.
+
+**Mapping CAS → id:** filter `included[]` op `type=="testCase"` en match
+`attributes.businessId == "{{cas_code}}"`. Het `id`-veld van die record is
+`testcase_id`.
+
+Zie [`samples/get-test-scenario-1.json`](samples/get-test-scenario-1.json)
+voor een echte response.
 
 ---
 
@@ -94,29 +95,44 @@ Accept: application/vnd.api+json
 
 ---
 
-## 4. Voeg testcase toe aan testrun via scenario  *(officieel — vermoed, TBD)*
+## 4. Voeg testcase toe aan testrun  *(officieel — BEVESTIGD)*
 
-**Vermoede endpoint (JSON:API relationship):**
+**Endpoint:** `POST {{api_base}}/{{env}}/test-runs/{{run_id}}/test-cases`
 
-`POST {{api_base}}/{{env}}/test-runs/{{run_id}}/relationships/testCases`
+(Stoplight-slug: `468d6afc8761f-add-test-case`. Beschrijving: *"Copies a
+test design test case and adds it to a test run."* — de testcase wordt
+gekopieerd; je krijgt een nieuw `testRunTestCase`-record terug.)
+
+**Headers:**
+
+```
+Authorization: Basic {{basic}}
+Content-Type: application/vnd.api+json
+Accept: application/vnd.api+json
+```
 
 **Body:**
 
 ```json
 {
-  "data": [
-    { "type": "testCase", "id": "{{testcase_id}}",
-      "meta": { "scenarioId": "{{scenario_id}}" } }
-  ]
+  "data": {
+    "relationships": {
+      "testDesignTestCase": {
+        "data": { "id": "{{testcase_id}}", "type": "testCase" }
+      }
+    }
+  }
 }
 ```
 
-**Onbekend:** of `meta.scenarioId` de juiste manier is om de SCE-koppeling
-te leggen, of dat er een aparte `testRunTestScenario`-resource is. De
-"Get a test scenario"-response noemt het type `testRunTestScenario` — dus
-de relatie bestaat als eigen resource. Te bevestigen in Stoplight.
+**Response (201):** `data.id` = `trtc_id` (nodig voor stap 5).
+`data.type = "testRunTestCase"`.
 
-**Fallback (UI):** zie 4b.
+**Belangrijke open vraag:** de body bevat **geen scenario-veld**. De
+oorspronkelijke wens (scenario-naam zichtbaar bij de case in de testrun)
+hangt af van of Testersuite zelf het scenario afleidt uit de design-case
+(via `testScenarioTestCase`-relatie). Te valideren in een staging-run —
+zie [open-questions.md](open-questions.md#scenario-label).
 
 ---
 

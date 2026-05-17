@@ -11,52 +11,51 @@ Voorbeeld: `customer=superp`, `customer_id=environmentId=1`, `cycle_id=2`, `run_
 Officiële API: HTTP **Basic** (`Authorization: Basic <base64(user:pass)>`).
 Niet Bearer. Format: `application/vnd.api+json` (JSON:API).
 
-## 3. Stoplight-pagina's die ik nog nodig heb
+## 3. Stoplight — beantwoord ✅
 
-De volgende drie pagina's bestaan vermoedelijk; check op
-https://testersuite.stoplight.io/docs/api en plak de Request/Response.
+- Add test case aan testrun: bevestigd, `POST /{env}/test-runs/{runId}/test-cases`
+  met body `{ data: { relationships: { testDesignTestCase: { data: {id, type} } } } }`
+- Add test scenario aan testrun: **bestaat niet** officieel volgens jou.
 
-### a) Voeg scenario óf testcase toe aan een testrun
+## 3b. Stoplight — nog te zoeken
 
-Zoek pagina's zoals:
+### Update testresult
 
-- "Add test scenario to test run"
-- "Add test case to test run"
-- of relationship-endpoints: `POST /test-runs/{id}/relationships/testScenarios`
-  / `…/relationships/testCases`
+Zoek "Update test run test case", "Set result", of `PATCH`-endpoint op
+`/test-run-test-cases/{id}` of `/test-runs/{id}/test-cases/{id}`.
+Nodig: method, path, body-structuur, toegestane `status`-waarden.
 
-Wat ik specifiek nodig heb:
+### Test scenario test case (slug `c65d7cb23d459`)
 
-- exacte path
-- body-structuur (JSON:API `data` array of object?)
-- of de `scenario_id` als `meta.scenarioId`, als aparte
-  `testRunTestScenario`-resource, of via een ander veld meekomt — want
-  dat is de hele crux (jouw eis: "scenario-naam moet bij de case staan")
+Slug uit jouw eerste paste — wat doet dit endpoint precies? Welke method
++ path, en wat zit er in de response?
 
-### b) Update testresult
+## 4. SCE/CAS code → ID mapping — BEANTWOORD ✅
 
-Zoek "Update test run test case", "Set result", of vergelijkbaar.
-Pad-vermoedens: `PATCH /test-run-test-cases/{id}` of
-`/test-runs/{id}/test-cases/{id}`.
+`SCE<nr>` en `CAS<nr>` zitten beide in `attributes.businessId`. Voorbeeld:
 
-### c) Test scenario test case (slug `c65d7cb23d459`)
+- scenario id `1` → `attributes.businessId == "SCE1"`
+- testcase id `39` → `attributes.businessId == "CAS39"`
 
-Dit slug suggereert een endpoint voor de scenario↔testcase relatie zelf.
-Welke method + path, en welke velden bevat het response?
+Er is geen documented `filter[businessId]` — match client-side, of
+pagineer met `filter[testCycle]` als scope-beperking.
 
-## 4. Hoe linkt een SCE-code aan een scenario-record?
+Sample-response staat in [`samples/get-test-scenario-1.json`](samples/get-test-scenario-1.json).
 
-`filter[code]` bestaat **niet** op `/test-scenarios`. Wat zit er wél in
-`attributes`? Drie scenario's:
+## 4b. Scenario-label in de testrun-weergave <a id="scenario-label"></a>
 
-- Het is een naam-veld (`attributes.name` of `attributes.shortDescription`).
-- Het is een custom field (`attributes.customField19` o.i.d.) → dan kun
-  je `filter[customField_19]=SCE001` gebruiken.
-- Het is een dedicated veld (`attributes.code`).
+De officiële add-testcase endpoint accepteert **alleen** een
+`testDesignTestCase`-reference, geen scenario. Vraag: wordt het
+scenario-label dan automatisch getoond bij die regel in de testrun?
 
-Antwoord helpt me bepalen of we client-side moeten matchen of of er een
-filter-truc is. Een voorbeeld-response van `GET /1/test-scenarios/1` is
-genoeg.
+Hypothese: ja, Testersuite leidt het scenario af uit de
+`testScenarioTestCase`-relatie van de design-testcase. Te testen op
+staging door één keer een case te toevoegen via deze API en in de UI te
+kijken of het scenario zichtbaar is.
+
+Als het label niet vanzelf verschijnt, vallen we terug op de UI-add-flow
+(form-urlencoded, sessie-auth) — vangst staat klaar in
+[devtools-capture-guide.md](devtools-capture-guide.md).
 
 ## 5. Status-vocabulaire
 

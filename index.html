@@ -106,27 +106,29 @@ const USECASES = {
              "start_date", "end_date"],
   },
   "add-testcase-to-run-official": {
-    title: "Add testcase to testrun (JSON:API relationship — TBD)",
+    title: "Add testcase to testrun (officieel, kopieert design naar run)",
     surface: "official",
     method: "POST",
-    url: "$api_base/$env/test-runs/$run_id/relationships/testCases",
+    url: "$api_base/$env/test-runs/$run_id/test-cases",
     headers: {
       "Authorization": "Basic $basic",
       "Content-Type": "application/vnd.api+json",
       "Accept": "application/vnd.api+json",
     },
     body: {
-      data: [
-        { type: "testCase", id: "$testcase_id",
-          meta: { scenarioId: "$scenario_id" } },
-      ],
+      data: {
+        relationships: {
+          testDesignTestCase: {
+            data: { id: "$testcase_id", type: "testCase" },
+          },
+        },
+      },
     },
     body_form: null,
-    expected_status: 200,
-    extract: "trtc_id (structuur TBD)",
-    status: "TBD — Stoplight bevestigen",
-    params: ["api_base", "env", "basic", "run_id",
-             "scenario_id", "testcase_id"],
+    expected_status: 201,
+    extract: "data.id -> trtc_id",
+    status: "official (geen scenario-veld in body)",
+    params: ["api_base", "env", "basic", "run_id", "testcase_id"],
   },
   "update-result-official": {
     title: "Update testcase result in testrun (TBD)",

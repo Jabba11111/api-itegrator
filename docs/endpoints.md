@@ -21,6 +21,7 @@ URL = `{api_base}/{environmentId}/<path>`. De `{environmentId}` is dezelfde
 | Test scenario ↔ test case | ? | (slug) | `c65d7cb23d459-test-scenario-test-case` |
 | Test scenario (resource) | ? | (slug) | `273a0d26ebfde-test-scenario` |
 | Create a test run | POST | `/{env}/test-runs` | `6d3ae0aeb118b-create-a-test-run` |
+| **Add test case to run** | POST | `/{env}/test-runs/{runId}/test-cases` | `468d6afc8761f-add-test-case` |
 
 Query-parameters op `Retrieve all`:
 
@@ -31,18 +32,13 @@ Query-parameters op `Retrieve all`:
 **Niet aanwezig:** `filter[code]` of `filter[name]`. Lookup op SCE-code
 gaat dus niet direct via query — zie `plan.md` voor de drie alternatieven.
 
-## Officiële API — vermoed maar onbevestigd
+## Officiële API — nog te bevestigen
 
-JSON:API-conventies suggereren dat het volgende bestaat. Te bevestigen in
-Stoplight (zie open-questions.md):
-
-| Doel | Vermoede method + path |
-|---|---|
-| Voeg scenario toe aan testrun | `POST /{env}/test-runs/{runId}/relationships/testScenarios` |
-| Voeg testcase toe aan testrun | `POST /{env}/test-runs/{runId}/relationships/testCases` |
-| Vervang testcase-set van testrun | `PATCH /{env}/test-runs/{runId}/relationships/testCases` |
-| Update testcase-resultaat | `PATCH /{env}/test-run-test-cases/{trtcId}` of `…/test-runs/{runId}/test-cases/{trtcId}` |
-| Verwijder uit testrun | `DELETE` op zelfde URL |
+| Doel | Vermoede method + path | Status |
+|---|---|---|
+| Voeg scenario toe aan testrun | — | **niet aanwezig** volgens user |
+| Update testcase-resultaat | `PATCH /{env}/test-runs/{runId}/test-cases/{trtcId}` of `/{env}/test-run-test-cases/{trtcId}` | TBD — Stoplight bevestigen |
+| Verwijder testcase uit testrun | `DELETE /{env}/test-runs/{runId}/test-cases/{trtcId}` | TBD |
 
 ## UI-endpoints — vastgelegd (via DevTools)
 

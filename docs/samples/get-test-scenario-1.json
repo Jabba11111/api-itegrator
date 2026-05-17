@@ -1,0 +1,43 @@
+{
+  "_comment": "Echte respons van GET /1/test-scenarios/1 op superp-instance. Gebruikt als referentie voor mapping SCE/CAS code -> id en voor relationships-structuur.",
+  "data": {
+    "id": "1",
+    "type": "testScenario",
+    "attributes": {
+      "businessId": "SCE1",
+      "shortDescription": "Synchronisatie word document",
+      "longDescription": "Word document moet gesynchroniseerd worden met Sharepoint na het opslaan in Test_JJ",
+      "preparation": null,
+      "createDate": "2026-04-01T16:11:09+02:00",
+      "lastUpdated": "2026-04-01T16:38:06+02:00"
+    },
+    "links": {
+      "self": "https://superp.testersuite.nl.api.testersuite.com/1/test-scenarios/1"
+    },
+    "relationships": {
+      "testCases": {
+        "data": [
+          { "id": "39", "type": "testCase" },
+          { "id": "40", "type": "testCase" }
+        ]
+      },
+      "testScenarioTestCases": {
+        "data": [
+          { "id": "1", "type": "testScenarioTestCase" },
+          { "id": "2", "type": "testScenarioTestCase" }
+        ]
+      },
+      "testCycle": { "data": { "id": "4", "type": "testCycle" } },
+      "designStatus": { "data": { "id": "1", "type": "designStatus" } },
+      "owner": { "data": { "id": "2", "type": "user" } },
+      "testType": { "data": { "id": "2", "type": "testType" } },
+      "process": { "data": [] }
+    }
+  },
+  "included_summary": [
+    { "type": "testCase", "id": "39", "businessId": "CAS39", "shortDescription": "Word document aanmaken in Test_JJ" },
+    { "type": "testCase", "id": "40", "businessId": "CAS40", "shortDescription": "Controle in Sharepoint" },
+    { "type": "testScenarioTestCase", "id": "1", "position": 1, "testCase_ref": "39" },
+    { "type": "testScenarioTestCase", "id": "2", "position": 2, "testCase_ref": "40" }
+  ]
+}

@@ -55,24 +55,28 @@ Mogelijke aanpakken (volgorde van voorkeur):
 
 Idem voor CAS-code → testcase_id.
 
-## Stappen in de Tosca-runtime — herzien
+## Stappen in de Tosca-runtime — herzien (ronde 3)
 
 ```
 Per CAS die Tosca uitvoert:
 
-1. (optioneel) lookup scenario  GET  /{env}/test-scenarios?filter[testCycle]=…
-2. (optioneel) lookup testcase  GET  /{env}/test-scenarios/{sid}  (included testcases)
-3. add testcase to run          POST /{env}/test-runs/{run_id}/relationships/testCases
-                                  ↑ vermoedelijk officieel — bevestigen
+1. (optioneel) lookup scenario   GET  /{env}/test-scenarios?filter[testCycle]=…
+                                   match attributes.businessId == "SCE<nr>"
+2. (optioneel) lookup testcase   GET  /{env}/test-scenarios/{scenario_id}
+                                   filter included[] op type=testCase,
+                                   match attributes.businessId == "CAS<nr>"
+3. add testcase to run           POST /{env}/test-runs/{run_id}/test-cases
+                                   body: testDesignTestCase relationship  ✅ OFFICIEEL
 4. Tosca voert uit
-5. update result                PATCH /{env}/test-run-test-cases/{trtc_id}
-                                  ↑ resource-naam te bevestigen
+5. update result                 PATCH /{env}/.../{trtc_id}                ⏳ TBD
 ```
 
-Als 3 en 5 officieel bestaan in JSON:API: één auth (Basic), één format,
-geen UI-endpoints nodig. Als ze niet bestaan: fallback op
-`POST /{customer_id}/testcycle/{cycle_id}/testrun/{run_id}/<action>` met
-sessie-auth.
+Stap 3 is bevestigd officieel. Stap 5 nog niet gevonden in Stoplight.
+
+**Belangrijke vraag bij stap 3:** of het scenario-label automatisch
+verschijnt naast de toegevoegde case in de testrun-weergave (zie
+[open-questions.md](open-questions.md#scenario-label)). Als niet, dan UI
+fallback voor stap 3 inzetten.
 
 ## Wat dit project oplevert
 
