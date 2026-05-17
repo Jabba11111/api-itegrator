@@ -37,9 +37,12 @@ puur templating.</p>
 
 <label><input type="checkbox" id="withCurl" checked> ook curl-voorbeeld tonen</label>
 <button id="render">Genereer</button>
+<button id="execute" type="button">Voer uit (fetch)</button>
 
 <h3>Resultaat</h3>
 <pre id="output">(kies een use case)</pre>
+<h3>Respons</h3>
+<pre id="response">(klik "Voer uit" om de call te doen)</pre>
 
 <script>
 const USECASES = {
@@ -346,19 +349,44 @@ function buildFields() {
 select.addEventListener("change", buildFields);
 buildFields();
 
-document.getElementById("render").addEventListener("click", () => {
+function gatherRendered() {
   const spec = USECASES[select.value];
   const values = {};
   for (const name of spec.params) {
     const el = document.getElementById(`f_${name}`);
     values[name] = el.value || `$${name}`;
   }
-  const r = renderUC(spec, values);
+  return renderUC(spec, values);
+}
+
+document.getElementById("render").addEventListener("click", () => {
+  const r = gatherRendered();
   let out = formatBlock(r);
   if (document.getElementById("withCurl").checked) {
     out += "\n\n# curl:\n" + formatCurl(r);
   }
   document.getElementById("output").textContent = out;
+});
+
+document.getElementById("execute").addEventListener("click", async () => {
+  const r = gatherRendered();
+  const respEl = document.getElementById("response");
+  respEl.textContent = "bezig…";
+  const opts = { method: r.method, headers: r.headers, mode: "cors" };
+  if (r.bodyText !== null && r.bodyText !== "" && r.method !== "GET") {
+    opts.body = r.bodyText;
+  }
+  try {
+    const resp = await fetch(r.url, opts);
+    const text = await resp.text();
+    let pretty = text;
+    try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (_) {}
+    respEl.textContent = `HTTP ${resp.status} ${resp.statusText}\n\n${pretty}`;
+  } catch (err) {
+    respEl.textContent = "Fetch faalde: " + err.message +
+      "\n\nWaarschijnlijk CORS — gebruik dan de curl uit het Resultaat-blok " +
+      "in een terminal, of voer de call vanuit Tosca's HTTP-module.";
+  }
 });
 </script>
 </body>

@@ -30,8 +30,10 @@ moet zijn vóór de tweede oplevering.
 
 ## Plan en use cases
 
-Beslisplan en flow per Tosca-stap: [`docs/plan.md`](docs/plan.md).
-Use cases met exacte request-shape: [`docs/usecases.md`](docs/usecases.md).
+- Beslisplan en flow per Tosca-stap: [`docs/plan.md`](docs/plan.md).
+- Use cases met exacte request-shape: [`docs/usecases.md`](docs/usecases.md).
+- **Tosca-blueprint:** vijf HTTP-modules voor één testrun-cyclus:
+  [`docs/tosca-flow.md`](docs/tosca-flow.md).
 
 **Officiële API (HTTP Basic + JSON:API, bevestigd via Stoplight):**
 
