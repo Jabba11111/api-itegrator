@@ -42,14 +42,18 @@ gaat dus niet direct via query — zie `plan.md` voor de drie alternatieven.
 | Voeg scenario toe aan testrun | — | niet aanwezig officieel |
 | List testRunTestCaseStatus waarden | `GET /{env}/test-run-test-case-statuses` of via included | vermoed, TBD |
 
-## Status-mapping (uit vangst)
+## Status-mapping
+
+Testersuite kent slechts twee resultaten: `ok` en `notok`.
 
 | `executionStatus.id` | `attributes.status` |
 |---|---|
 | `4` | `"notok"` |
 | ? | `"ok"` |
-| ? | `"pending"` |
-| ? | `"blocked"` |
+
+De `id` voor `"ok"` is nog niet vastgelegd — eenvoudig te achterhalen
+door één testcase in de UI op "ok" te zetten en
+`GET /{env}/test-runs/{run}/test-cases/{trtc}` opnieuw te doen.
 
 ## UI-endpoints — vastgelegd (via DevTools)
 

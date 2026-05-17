@@ -32,15 +32,16 @@ Open sub-vragen voor de PATCH:
 
 ## 5. Status-vocabulaire — gedeeltelijk beantwoord
 
-Geobserveerd: `attributes.status = "notok"` ↔ `executionStatus.id = 4`.
+Er zijn maar twee waarden: `ok` en `notok`.
 
-Nog nodig: de overige `testRunTestCaseStatus`-records. Snelste manier:
+| `executionStatus.id` | `attributes.status` |
+|---|---|
+| `4` | `"notok"` |
+| ? | `"ok"` |
 
-- Klik in de UI een testcase door naar `ok` / `blocked` / `pending` etc.
-- Run de CLI `python3 -m ts_builder --curl get-testruntestcase env=1 run_id=92 trtc_id=425 basic=…`
-- Noteer welke `executionStatus.id` bij welke string hoort.
-
-Of, als er een endpoint is: `GET /{env}/test-run-test-case-statuses`.
+Eén waarde nog open: de `executionStatus.id` voor `"ok"`. Zet één case
+in de UI op "ok" en run `python3 -m ts_builder --curl get-testruntestcase
+env=1 run_id=92 trtc_id=… basic=… api_base=…` om hem te achterhalen.
 
 ## 4. SCE/CAS code → ID mapping — BEANTWOORD ✅
 
