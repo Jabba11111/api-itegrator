@@ -162,6 +162,25 @@ Zet één case in de UI op "OK", run deze module, en lees
   case al in de run. Roep dan `GET /test-runs/{run}/test-cases` aan om
   de bestaande `TRTC_ID` op te halen voor Module 5.
 
+## Valkuil: drie soorten ID's door elkaar
+
+Testersuite gebruikt drie verschillende numerieke ID-ruimtes. Verwar ze niet:
+
+| Soort | Voorbeeld | Waar te vinden |
+|---|---|---|
+| **design testCase id** | `39`, `40` | `GET /test-scenarios/{sid}` → `included[type=testCase].id` |
+| **testRunTestCase id (trtc_id)** | `425` | `POST /test-runs/{run}/test-cases` response `data.id` |
+| **CAS-code (businessId)** | `CAS39`, `CAS2` | `attributes.businessId` op beide bovenstaande resources |
+
+**De Module-3-body verwacht de design id**, niet de trtc_id. Een trtc_id
+in `testDesignTestCase.data.id` zetten geeft **HTTP 404**.
+
+```
+testDesignTestCase.data.id  →  design testCase id (uit included[])
+                               ↑
+                               NIET de id die je terugkrijgt uit een eerdere add-call
+```
+
 ## Foutafhandeling per call
 
 | HTTP-code | Betekenis | Actie |
@@ -169,7 +188,7 @@ Zet één case in de UI op "OK", run deze module, en lees
 | `200/201` | OK | door |
 | `400` | bad request | log body, stop run |
 | `401` | auth fout | stop run, check `TS_BASIC` |
-| `404` | resource niet gevonden | log, markeer skipped |
+| `404` | resource niet gevonden | check ID-soort (design vs trtc!), log, markeer skipped |
 | `409` | al toegevoegd | lookup bestaande TRTC_ID |
 | `5xx` | server fout | retry 2× met backoff |
 

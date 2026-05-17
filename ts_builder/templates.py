@@ -88,16 +88,16 @@ USECASES = {
             "data": {
                 "relationships": {
                     "testDesignTestCase": {
-                        "data": {"id": "$testcase_id", "type": "testCase"}
+                        "data": {"id": "$design_testcase_id", "type": "testCase"}
                     }
                 }
             }
         },
         "body_form": None,
         "expected_status": 201,
-        "extract": "data.id -> trtc_id (testRunTestCase id)",
-        "status": "official (geen scenario-veld in body)",
-        "params": ["api_base", "env", "basic", "run_id", "testcase_id"],
+        "extract": "data.id -> trtc_id (testRunTestCase id, andere ID-ruimte!)",
+        "status": "official — let op: design_testcase_id != trtc_id",
+        "params": ["api_base", "env", "basic", "run_id", "design_testcase_id"],
     },
     "get-testruntestcase": {
         "title": "Get one testRunTestCase (read result)",
