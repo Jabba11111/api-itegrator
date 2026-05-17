@@ -42,7 +42,19 @@ gaat dus niet direct via query — zie `plan.md` voor de drie alternatieven.
 | Voeg scenario toe aan testrun | — | niet aanwezig officieel |
 | List testRunTestCaseStatus waarden | `GET /{env}/test-run-test-case-statuses` of via included | vermoed, TBD |
 
-## Status-mapping
+## ID-ruimtes in Testersuite
+
+Vier verschillende numerieke ID-ruimtes — verwarring leidt tot 404 / verkeerde scope.
+
+| Soort | Voorbeeld | Waar |
+|---|---|---|
+| design `testCase` id | `2` | `attributes.businessId="CAS2"` |
+| design `testScenario` id | `3` | `attributes.businessId="SCE3"` |
+| `testRunTestCase` id (trtc) | `447` | `databaseid="447"` in HTML, `id` na POST |
+| `testRunTestScenario` id (runsce) | `2` | `runsce_id="2"` in HTML — run-interne koppeling |
+
+Let op: `runsce_id` en design `testScenario` id zijn **verschillende reeksen**.
+In de HTML hierboven heeft de SCE3-badge `runsce_id="2"` (niet 3).
 
 Vijf statuswaarden, gezien in een `progress`-response van Testersuite:
 `notstarted`, `started`, `ok`, `notok`, `skipped`.
@@ -70,10 +82,11 @@ https://{customer}.testersuite.nl/{customer_id}/testcycle/{cycle_id}/testrun/{ru
 
 | Action | Method | Doel | Status |
 |---|---|---|---|
-| `listtestscenariostoadd` | POST | lijst SCE's die nog toegevoegd kunnen worden | ✅ vangst aanwezig |
-| `get-testscenarios-testcases-rows` | POST | lijst CAS's al in run, per SCE | ✅ vangst aanwezig |
-| `{add-action}` | POST | testcase toevoegen | ⏳ vangst nodig — als fallback |
-| `{update-result-action}` | POST | resultaat updaten | ⏳ vangst nodig — als fallback |
+| `listtestscenariostoadd` | POST | popup 1: lijst SCE's die nog toegevoegd kunnen worden | ✅ vangst |
+| `get-testscenarios-testcases-rows` | POST | popup 2: lijst CAS's per gekozen SCE | ✅ vangst |
+| `papi/testscenario/RUN{run_id}/testcases` | GET | **lijst alle trtc's in run met SCE-badge** (HTML) | ✅ vangst |
+| `{add-testscenario-or-cases}` | POST | submit die scenarios+cases aan run koppelt | ⏳ vangst nodig |
+| `{update-action}` | POST/PATCH | resultaat updaten | (officieel mogelijk, zie boven) |
 
 Content-Type van UI-calls is `application/x-www-form-urlencoded; charset=UTF-8`.
 
