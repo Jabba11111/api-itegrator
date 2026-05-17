@@ -64,3 +64,164 @@ Content-Type:
 Payload:
 Response (relevant deel):
 ```
+
+
+
+https://superp.testersuite.nl/1/testcycle/2/testrun/2/listtestscenariostoadd
+Request Method
+POST
+Status Code
+200 OK
+Remote Address
+109.235.75.203:443
+Referrer Policy
+strict-origin-when-cross-origin
+cache-control
+no-store, no-cache, must-revalidate
+connection
+Keep-Alive
+content-length
+3483
+content-security-policy
+base-uri 'self'; script-src 'self'; worker-src 'self' blob:; object-src 'none';
+content-security-policy-report-only
+default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; base-uri 'self'; script-src 'self'; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'
+content-type
+application/json; charset=utf-8
+date
+Sun, 17 May 2026 20:30:59 GMT
+expires
+Thu, 19 Nov 1981 08:52:00 GMT
+keep-alive
+timeout=10, max=97
+pragma
+no-cache
+referrer-policy
+strict-origin-when-cross-origin
+server
+Apache
+set-cookie
+refreshToken=4f22b51576c30c99bb9362356a2c0770ce60d6240a29a8cf4d464ee6490b5f45f505bfd19379b785d8faf2e2826f01c36f8e9ece18d13f00325c5421480d681a; path=/; secure; HttpOnly; SameSite=Lax
+strict-transport-security
+max-age=31536000; includeSubDomains
+x-content-type-options
+nosniff
+x-frame-options
+SAMEORIGIN
+accept
+*/*
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7
+connection
+keep-alive
+content-length
+183
+content-type
+application/x-www-form-urlencoded; charset=UTF-8
+cookie
+PHPSESSID=d28065f0d755ed92fecb4a07e111d8af; refreshToken=4f22b51576c30c99bb9362356a2c0770ce60d6240a29a8cf4d464ee6490b5f45f505bfd19379b785d8faf2e2826f01c36f8e9ece18d13f00325c5421480d681a
+host
+superp.testersuite.nl
+origin
+https://superp.testersuite.nl
+referer
+https://superp.testersuite.nl/1/testcycle/2/testrun/2/edit
+sec-ch-ua
+"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Windows"
+sec-fetch-dest
+empty
+sec-fetch-mode
+cors
+sec-fetch-site
+same-origin
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36
+x-requested-with
+XMLHttpRequest
+
+
+
+Request URL
+https://superp.testersuite.nl/1/testcycle/2/testrun/2/get-testscenarios-testcases-rows
+Request Method
+POST
+Status Code
+200 OK
+Remote Address
+109.235.75.203:443
+Referrer Policy
+strict-origin-when-cross-origin
+cache-control
+no-store, no-cache, must-revalidate
+connection
+Keep-Alive
+content-security-policy
+base-uri 'self'; script-src 'self'; worker-src 'self' blob:; object-src 'none';
+content-security-policy-report-only
+default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; base-uri 'self'; script-src 'self'; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'
+content-type
+application/json; charset=utf-8
+date
+Sun, 17 May 2026 20:30:59 GMT
+expires
+Thu, 19 Nov 1981 08:52:00 GMT
+keep-alive
+timeout=10, max=98
+pragma
+no-cache
+referrer-policy
+strict-origin-when-cross-origin
+server
+Apache
+set-cookie
+refreshToken=4f22b51576c30c99bb9362356a2c0770ce60d6240a29a8cf4d464ee6490b5f45f505bfd19379b785d8faf2e2826f01c36f8e9ece18d13f00325c5421480d681a; path=/; secure; HttpOnly; SameSite=Lax
+strict-transport-security
+max-age=31536000; includeSubDomains
+transfer-encoding
+chunked
+x-content-type-options
+nosniff
+x-frame-options
+SAMEORIGIN
+accept
+*/*
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7
+connection
+keep-alive
+content-length
+83
+content-type
+application/x-www-form-urlencoded; charset=UTF-8
+cookie
+PHPSESSID=d28065f0d755ed92fecb4a07e111d8af; refreshToken=4f22b51576c30c99bb9362356a2c0770ce60d6240a29a8cf4d464ee6490b5f45f505bfd19379b785d8faf2e2826f01c36f8e9ece18d13f00325c5421480d681a
+host
+superp.testersuite.nl
+origin
+https://superp.testersuite.nl
+referer
+https://superp.testersuite.nl/1/testcycle/2/testrun/2/edit
+sec-ch-ua
+"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Windows"
+sec-fetch-dest
+empty
+sec-fetch-mode
+cors
+sec-fetch-site
+same-origin
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36
+x-requested-with
+XMLHttpRequest
