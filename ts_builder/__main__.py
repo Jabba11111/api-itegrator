@@ -37,10 +37,10 @@ def _format_curl(r):
 DEFAULT_VALUES = {
     "api_base": "https://{customer}.testersuite.nl.api.testersuite.com",
     "ui_base": "https://{customer}.testersuite.nl/{customer_id}",
-    "token": "{{token}}",
+    "env": "{{env}}",
+    "basic": "{{base64(user:pass)}}",
     "add_action": "{{add_action — vangst nodig}}",
     "update_action": "{{update_action — vangst nodig}}",
-    "remove_action": "{{remove_action — vangst nodig}}",
 }
 
 

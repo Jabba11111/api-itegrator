@@ -30,18 +30,22 @@ moet zijn vóór de tweede oplevering.
 
 ## Plan en use cases
 
-Beslisplan, twee API-oppervlakken (Bearer vs UI) en flow per Tosca-stap:
-[`docs/plan.md`](docs/plan.md).
-
+Beslisplan en flow per Tosca-stap: [`docs/plan.md`](docs/plan.md).
 Use cases met exacte request-shape: [`docs/usecases.md`](docs/usecases.md).
 
-1. Lookup SCE-code → scenario-id *(Bearer)*
-2. Lookup CAS-code → testcase-id binnen scenario *(Bearer)*
-3. Lijst van toe te voegen scenarios *(UI, captured)*
-4. Lijst van testcases in testrun *(UI, captured)*
-5. Voeg testcase toe aan testrun via scenario *(UI, vangst nodig)*
-6. Update testcase-resultaat *(UI, vangst nodig)*
-7. Verwijder testcase uit testrun *(UI, optioneel)*
+**Officiële API (HTTP Basic + JSON:API, bevestigd via Stoplight):**
+
+1. List scenarios in cycle — `GET /{env}/test-scenarios?filter[testCycle]=…`
+2. Get one scenario incl. testcases — `GET /{env}/test-scenarios/{id}`
+3. Create a test run — `POST /{env}/test-runs`
+4. Add testcase to testrun — `POST /{env}/test-runs/{id}/relationships/testCases` *(vermoed, TBD)*
+5. Update result — `PATCH /{env}/test-run-test-cases/{id}` *(vermoed, TBD)*
+
+**UI fallback (form-urlencoded + sessie):**
+
+- `POST {ui_base}/testcycle/{cy}/testrun/{rn}/listtestscenariostoadd` *(captured)*
+- `POST {ui_base}/testcycle/{cy}/testrun/{rn}/get-testscenarios-testcases-rows` *(captured)*
+- Add / update / remove — vangst nodig als de officiële endpoints (4/5) niet bestaan.
 
 ## Quickstart
 

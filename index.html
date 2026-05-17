@@ -15,7 +15,7 @@
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
   .badge { display: inline-block; padding: 1px 6px; border-radius: 3px;
            font-size: 11px; margin-left: 6px; }
-  .badge.bearer { background: #d9eafd; color: #1558b0; }
+  .badge.official { background: #d9eafd; color: #1558b0; }
   .badge.ui { background: #fde4cf; color: #b85c00; }
   button { margin-top: 12px; padding: 8px 14px; font: inherit;
            background: #1a73e8; color: white; border: 0; border-radius: 4px;
@@ -36,7 +36,6 @@ puur templating.</p>
 <div class="grid" id="fields"></div>
 
 <label><input type="checkbox" id="withCurl" checked> ook curl-voorbeeld tonen</label>
-
 <button id="render">Genereer</button>
 
 <h3>Resultaat</h3>
@@ -44,38 +43,121 @@ puur templating.</p>
 
 <script>
 const USECASES = {
-  "lookup-scenario": {
-    title: "Lookup SCE-code -> scenario_id",
-    surface: "bearer",
+  "list-scenarios": {
+    title: "List test scenarios in a cycle",
+    surface: "official",
     method: "GET",
-    url: "$api_base/test-scenarios?code=$sce_code",
+    url: "$api_base/$env/test-scenarios?filter[testCycle]=$cycle_id&page[offset]=0",
     headers: {
-      "Authorization": "Bearer $token",
-      "Accept": "application/json",
+      "Authorization": "Basic $basic",
+      "Accept": "application/vnd.api+json",
     },
     body: null, body_form: null,
     expected_status: 200,
-    extract: "data[0].id -> scenario_id",
-    status: "official (query-key TBD)",
-    params: ["api_base", "token", "sce_code"],
+    extract: "data[].id, attributes.* -> match SCE-code client-side",
+    status: "official",
+    params: ["api_base", "env", "basic", "cycle_id"],
   },
-  "lookup-testcase": {
-    title: "Lookup CAS-code -> testcase_id (within scenario)",
-    surface: "bearer",
+  "get-scenario": {
+    title: "Get one scenario (incl. testcases via included[])",
+    surface: "official",
     method: "GET",
-    url: "$api_base/test-scenarios/$scenario_id/test-cases?code=$cas_code",
+    url: "$api_base/$env/test-scenarios/$scenario_id",
     headers: {
-      "Authorization": "Bearer $token",
-      "Accept": "application/json",
+      "Authorization": "Basic $basic",
+      "Accept": "application/vnd.api+json",
     },
     body: null, body_form: null,
     expected_status: 200,
-    extract: "data[0].id -> testcase_id",
-    status: "official (path TBD)",
-    params: ["api_base", "token", "scenario_id", "cas_code"],
+    extract: "included[type=testCase] -> match CAS-code -> testcase_id",
+    status: "official",
+    params: ["api_base", "env", "basic", "scenario_id"],
   },
-  "list-scenarios-to-add": {
-    title: "List scenarios still addable to testrun (UI)",
+  "create-test-run": {
+    title: "Create a test run",
+    surface: "official",
+    method: "POST",
+    url: "$api_base/$env/test-runs",
+    headers: {
+      "Authorization": "Basic $basic",
+      "Content-Type": "application/vnd.api+json",
+      "Accept": "application/vnd.api+json",
+    },
+    body: {
+      data: {
+        type: "testRun",
+        attributes: {
+          shortDescription: "$short_description",
+          longDescription: "$long_description",
+          startDate: "$start_date",
+          endDate: "$end_date",
+        },
+        relationships: {
+          testCycle: { data: { id: "$cycle_id", type: "testCycle" } },
+        },
+      },
+    },
+    body_form: null,
+    expected_status: 201,
+    extract: "data.id -> run_id",
+    status: "official",
+    params: ["api_base", "env", "basic", "cycle_id",
+             "short_description", "long_description",
+             "start_date", "end_date"],
+  },
+  "add-testcase-to-run-official": {
+    title: "Add testcase to testrun (JSON:API relationship — TBD)",
+    surface: "official",
+    method: "POST",
+    url: "$api_base/$env/test-runs/$run_id/relationships/testCases",
+    headers: {
+      "Authorization": "Basic $basic",
+      "Content-Type": "application/vnd.api+json",
+      "Accept": "application/vnd.api+json",
+    },
+    body: {
+      data: [
+        { type: "testCase", id: "$testcase_id",
+          meta: { scenarioId: "$scenario_id" } },
+      ],
+    },
+    body_form: null,
+    expected_status: 200,
+    extract: "trtc_id (structuur TBD)",
+    status: "TBD — Stoplight bevestigen",
+    params: ["api_base", "env", "basic", "run_id",
+             "scenario_id", "testcase_id"],
+  },
+  "update-result-official": {
+    title: "Update testcase result in testrun (TBD)",
+    surface: "official",
+    method: "PATCH",
+    url: "$api_base/$env/test-run-test-cases/$trtc_id",
+    headers: {
+      "Authorization": "Basic $basic",
+      "Content-Type": "application/vnd.api+json",
+      "Accept": "application/vnd.api+json",
+    },
+    body: {
+      data: {
+        type: "testRunTestCase",
+        id: "$trtc_id",
+        attributes: {
+          status: "$status",
+          comment: "$comment",
+          durationSeconds: "$duration_seconds",
+        },
+      },
+    },
+    body_form: null,
+    expected_status: 200,
+    extract: null,
+    status: "TBD — Stoplight bevestigen",
+    params: ["api_base", "env", "basic", "trtc_id",
+             "status", "comment", "duration_seconds"],
+  },
+  "list-scenarios-to-add-ui": {
+    title: "List addable scenarios (UI, captured)",
     surface: "ui",
     method: "POST",
     url: "$ui_base/testcycle/$cycle_id/testrun/$run_id/listtestscenariostoadd",
@@ -86,12 +168,12 @@ const USECASES = {
     },
     body: null, body_form: {},
     expected_status: 200,
-    extract: "lijst met SCE's",
+    extract: "lijst SCE's",
     status: "captured",
     params: ["ui_base", "cycle_id", "run_id"],
   },
-  "list-run-testcases": {
-    title: "List testcases already in testrun, grouped by SCE (UI)",
+  "list-run-testcases-ui": {
+    title: "List testcases in testrun (UI, captured)",
     surface: "ui",
     method: "POST",
     url: "$ui_base/testcycle/$cycle_id/testrun/$run_id/get-testscenarios-testcases-rows",
@@ -102,12 +184,12 @@ const USECASES = {
     },
     body: null, body_form: {},
     expected_status: 200,
-    extract: "rows met scenario+testcase combinaties",
+    extract: "rows",
     status: "captured",
     params: ["ui_base", "cycle_id", "run_id"],
   },
-  "add-testcase-to-run": {
-    title: "Add testcase to testrun via scenario (UI)",
+  "add-testcase-to-run-ui": {
+    title: "Add testcase to testrun (UI fallback)",
     surface: "ui",
     method: "POST",
     url: "$ui_base/testcycle/$cycle_id/testrun/$run_id/$add_action",
@@ -120,12 +202,12 @@ const USECASES = {
     body_form: { scenario_id: "$scenario_id", testcase_id: "$testcase_id" },
     expected_status: 200,
     extract: "testrun_testcase_id",
-    status: "TBD — DevTools capture nodig",
+    status: "TBD — DevTools capture",
     params: ["ui_base", "cycle_id", "run_id", "add_action",
              "scenario_id", "testcase_id"],
   },
-  "update-result": {
-    title: "Update testcase result in testrun (UI)",
+  "update-result-ui": {
+    title: "Update testcase result (UI fallback)",
     surface: "ui",
     method: "POST",
     url: "$ui_base/testcycle/$cycle_id/testrun/$run_id/$update_action",
@@ -143,37 +225,19 @@ const USECASES = {
     },
     expected_status: 200,
     extract: null,
-    status: "TBD — DevTools capture nodig",
+    status: "TBD — DevTools capture",
     params: ["ui_base", "cycle_id", "run_id", "update_action",
              "testrun_testcase_id", "status", "comment", "duration_seconds"],
-  },
-  "remove-testcase": {
-    title: "Remove testcase from testrun (UI, optional)",
-    surface: "ui",
-    method: "POST",
-    url: "$ui_base/testcycle/$cycle_id/testrun/$run_id/$remove_action",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      "X-Requested-With": "XMLHttpRequest",
-      "Accept": "application/json",
-    },
-    body: null,
-    body_form: { testrun_testcase_id: "$testrun_testcase_id" },
-    expected_status: 200,
-    extract: null,
-    status: "TBD — DevTools capture nodig",
-    params: ["ui_base", "cycle_id", "run_id", "remove_action",
-             "testrun_testcase_id"],
   },
 };
 
 const DEFAULTS = {
   api_base: "https://{customer}.testersuite.nl.api.testersuite.com",
   ui_base: "https://{customer}.testersuite.nl/{customer_id}",
-  token: "{{token}}",
+  env: "1",
+  basic: "{{base64(user:pass)}}",
   add_action: "{{add_action — vangst nodig}}",
   update_action: "{{update_action — vangst nodig}}",
-  remove_action: "{{remove_action — vangst nodig}}",
 };
 
 function sub(value, values) {
@@ -201,11 +265,8 @@ function renderUC(spec, values) {
   const body = sub(spec.body, values);
   const bodyForm = sub(spec.body_form, values);
   let bodyText = null;
-  if (body !== null) {
-    bodyText = JSON.stringify(body, null, 2);
-  } else if (bodyForm !== null) {
-    bodyText = Object.keys(bodyForm).length ? urlencode(bodyForm) : "";
-  }
+  if (body !== null) bodyText = JSON.stringify(body, null, 2);
+  else if (bodyForm !== null) bodyText = Object.keys(bodyForm).length ? urlencode(bodyForm) : "";
   return {
     title: spec.title, surface: spec.surface, status: spec.status,
     method: spec.method, url: sub(spec.url, values),
@@ -222,9 +283,7 @@ function formatBlock(r) {
     `${r.method} ${r.url}`,
   ];
   for (const [k, v] of Object.entries(r.headers)) lines.push(`${k}: ${v}`);
-  if (r.bodyText !== null && r.bodyText !== "") {
-    lines.push(""); lines.push(r.bodyText);
-  }
+  if (r.bodyText !== null && r.bodyText !== "") { lines.push(""); lines.push(r.bodyText); }
   lines.push("");
   lines.push(`# expected: HTTP ${r.expected_status}`);
   if (r.extract) lines.push(`# extract:  ${r.extract}`);
@@ -233,9 +292,7 @@ function formatBlock(r) {
 
 function formatCurl(r) {
   const parts = [`curl -sS -X ${r.method}`];
-  for (const [k, v] of Object.entries(r.headers)) {
-    parts.push(`  -H '${k}: ${v}'`);
-  }
+  for (const [k, v] of Object.entries(r.headers)) parts.push(`  -H '${k}: ${v}'`);
   if (r.bodyText !== null && r.bodyText !== "") {
     parts.push(`  --data '${r.bodyText.replace(/'/g, "'\\''")}'`);
   }

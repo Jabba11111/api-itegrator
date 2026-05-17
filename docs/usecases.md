@@ -4,117 +4,180 @@ Volgorde = wat Tosca tijdens een testrun nodig heeft.
 
 Notatie:
 
-- `{{api_base}}` = officiële Bearer-API base, bv. `https://superp.testersuite.nl.api.testersuite.com`
-- `{{ui_base}}` = UI-base, bv. `https://superp.testersuite.nl/1` (`1` = `customer_id`)
-- `{{cycle_id}}`, `{{run_id}}` = numerieke IDs (bv. `2` en `2`)
-- `{{token}}` = Bearer token (alleen voor `api_base`)
+- `{{api_base}}` = `https://{customer}.testersuite.nl.api.testersuite.com`
+- `{{ui_base}}` = `https://{customer}.testersuite.nl/{customer_id}`
+- `{{env}}` = `environmentId` (zelfde getal als `{customer_id}` in de UI, bv. `1`)
+- `{{basic}}` = `<base64(user:pass)>`
+- `{{cycle_id}}`, `{{run_id}}` = numerieke IDs
 
 Auth wordt door jou geleverd — deze docs beschrijven alleen de request-shape.
 
 ---
 
-## 1. Lookup SCE-code → scenario-id  *(Bearer)*
+## 1. Lookup scenarios in een testcyclus  *(officieel)*
 
-**Doel:** vertaal `SCE001` naar het interne `scenario_id`.
+**Doel:** vind het `scenario_id` dat hoort bij een SCE-code.
 
-**Endpoint:** `GET {{api_base}}/test-scenarios?code={{sce_code}}` *(exacte
-query-key volgens Stoplight bevestigen; alternatief: `?filter[code]=…`)*
-
-**Headers:**
-
-```
-Authorization: Bearer {{token}}
-Accept: application/json
-```
-
-**Doorgeven:** `data[0].id` → `{{scenario_id}}`.
-
----
-
-## 2. Lookup CAS-code → testcase-id  *(Bearer)*
-
-**Doel:** binnen een scenario, vertaal `CAS042` naar `testcase_id`.
-
-**Endpoint:** `GET {{api_base}}/test-scenarios/{{scenario_id}}/test-cases?code={{cas_code}}`
-*(Stoplight-slug `c65d7cb23d459-test-scenario-test-case`, exacte path bevestigen)*
-
-**Doorgeven:** `data[0].id` → `{{testcase_id}}`.
-
----
-
-## 3. Lees welke scenarios nog toegevoegd kunnen worden  *(UI)*
-
-**Doel:** UI-keuzelijst opbouwen (debug / verkenning).
-
-**Endpoint:**
-`POST {{ui_base}}/testcycle/{{cycle_id}}/testrun/{{run_id}}/listtestscenariostoadd`
+**Endpoint:** `GET {{api_base}}/{{env}}/test-scenarios?filter[testCycle]={{cycle_id}}&page[offset]=0`
 
 **Headers:**
 
 ```
-Content-Type: application/x-www-form-urlencoded; charset=UTF-8
-X-Requested-With: XMLHttpRequest
+Authorization: Basic {{basic}}
+Accept: application/vnd.api+json
 ```
 
-**Body:** form-urlencoded *(payload nog vast te leggen — vermoedelijk leeg
-of filter-params)*.
+**Response:** JSON:API lijst van `testScenario`-objecten, 10 per pagina.
+
+**Mapping SCE → id:** geen ingebouwde `code`-filter. Drie opties:
+
+1. Pagineer en match op `data[].attributes.name` of een vergelijkbaar veld
+   (welk veld dat exact is hangt af van jouw Testersuite-config — zie
+   open-questions.md).
+2. Gebruik `filter[customField_X]=SCE001` als SCE-code als custom field
+   is geconfigureerd.
+3. Sla over: laat Tosca het numerieke `scenario_id` direct kennen.
 
 ---
 
-## 4. Voeg losse testcase toe aan testrun via scenario  *(UI — vangst nodig)*
+## 2. Get one scenario (incl. testcases)  *(officieel)*
 
-**Dit is de kern-actie die Tosca nodig heeft.**
+**Doel:** alle testcases binnen één SCE ophalen — daaruit haal je het
+`testcase_id` voor een gegeven CAS-code.
 
-**Endpoint:** `POST {{ui_base}}/testcycle/{{cycle_id}}/testrun/{{run_id}}/{{add-action}}`
-— **`{{add-action}}` nog te bepalen** uit
-[devtools-capture-guide.md](devtools-capture-guide.md), vangst 1.
+**Endpoint:** `GET {{api_base}}/{{env}}/test-scenarios/{{scenario_id}}`
 
-**Body (verwacht, form-urlencoded):**
+**Headers:** zelfde als boven.
+
+**Response:** `data` = scenario, `included[]` bevat `testScenarioTestCase`,
+`testCase`, en `testCaseStep`-records. Filter `included[]` op
+`type==testCase` en match op `code`/`name` om `testcase_id` te vinden.
+
+---
+
+## 3. Create a test run  *(officieel)*
+
+**Doel:** een nieuwe testrun aanmaken (bv. bij het starten van een Tosca-batch).
+
+**Endpoint:** `POST {{api_base}}/{{env}}/test-runs`
+
+**Headers:**
+
+```
+Authorization: Basic {{basic}}
+Content-Type: application/vnd.api+json
+Accept: application/vnd.api+json
+```
+
+**Body (JSON:API):**
+
+```json
+{
+  "data": {
+    "type": "testRun",
+    "attributes": {
+      "shortDescription": "{{short_description}}",
+      "longDescription": "{{long_description}}",
+      "startDate": "{{start_date}}",
+      "endDate": "{{end_date}}"
+    },
+    "relationships": {
+      "testCycle": {
+        "data": { "id": "{{cycle_id}}", "type": "testCycle" }
+      }
+    }
+  }
+}
+```
+
+**Response:** `201` met `data.id` = nieuw `run_id`.
+
+---
+
+## 4. Voeg testcase toe aan testrun via scenario  *(officieel — vermoed, TBD)*
+
+**Vermoede endpoint (JSON:API relationship):**
+
+`POST {{api_base}}/{{env}}/test-runs/{{run_id}}/relationships/testCases`
+
+**Body:**
+
+```json
+{
+  "data": [
+    { "type": "testCase", "id": "{{testcase_id}}",
+      "meta": { "scenarioId": "{{scenario_id}}" } }
+  ]
+}
+```
+
+**Onbekend:** of `meta.scenarioId` de juiste manier is om de SCE-koppeling
+te leggen, of dat er een aparte `testRunTestScenario`-resource is. De
+"Get a test scenario"-response noemt het type `testRunTestScenario` — dus
+de relatie bestaat als eigen resource. Te bevestigen in Stoplight.
+
+**Fallback (UI):** zie 4b.
+
+---
+
+## 4b. Voeg testcase toe aan testrun  *(UI fallback)*
+
+**Endpoint:** `POST {{ui_base}}/testcycle/{{cycle_id}}/testrun/{{run_id}}/{{add_action}}`
+
+`{{add_action}}` nog vast te leggen via DevTools-vangst (zie
+[devtools-capture-guide.md](devtools-capture-guide.md)).
+
+**Body (form-urlencoded):**
 
 ```
 scenario_id={{scenario_id}}&testcase_id={{testcase_id}}
 ```
 
-**Response:** moet het `testrun_testcase_id` opleveren — nodig voor
-stap 5/6.
+---
 
-**Waarom via scenario en niet los:** als je puur de `testcase_id` toevoegt
-mist het scenario-label in de testrun-weergave. Door zowel `scenario_id`
-als `testcase_id` mee te sturen wordt de SCE-naam aan de regel gekoppeld.
+## 5. Update testcase-resultaat in testrun  *(officieel — vermoed, TBD)*
+
+**Vermoede endpoint:** `PATCH {{api_base}}/{{env}}/test-run-test-cases/{{trtc_id}}`
+
+(Resource-naam en path zijn een gok op basis van JSON:API-conventies — te
+bevestigen via Stoplight.)
+
+**Body:**
+
+```json
+{
+  "data": {
+    "type": "testRunTestCase",
+    "id": "{{trtc_id}}",
+    "attributes": {
+      "status": "{{status}}",
+      "comment": "{{comment}}",
+      "durationSeconds": {{duration_seconds}}
+    }
+  }
+}
+```
+
+**Fallback (UI):** vergelijkbare structuur als 4b.
 
 ---
 
-## 5. Update testcase-resultaat in testrun  *(UI — vangst nodig)*
+## 6. Lijst-calls (UI) — verkenning  *(captured)*
 
-**Endpoint:** `POST {{ui_base}}/testcycle/{{cycle_id}}/testrun/{{run_id}}/{{update-action}}`
-— **vangst 2** uit devtools-capture-guide.
+| Doel | URL |
+|---|---|
+| Wat kan ik nog toevoegen? | `POST {{ui_base}}/testcycle/{{cycle_id}}/testrun/{{run_id}}/listtestscenariostoadd` |
+| Wat zit er al in? | `POST {{ui_base}}/testcycle/{{cycle_id}}/testrun/{{run_id}}/get-testscenarios-testcases-rows` |
 
-**Body (verwacht):**
-
-```
-testrun_testcase_id={{testrun_testcase_id}}&status={{status}}&comment={{comment}}&duration_seconds={{duration_seconds}}
-```
-
-Toegestane `status`-waarden nog te bevestigen (vermoeden: `pass`, `fail`,
-`blocked`, `not_executed` of numerieke codes).
+Form-urlencoded, sessie-auth, `X-Requested-With: XMLHttpRequest`.
 
 ---
 
-## 6. Verwijder testcase uit testrun (rollback)  *(UI — optioneel)*
-
-Bij setup-fout in Tosca; alleen nuttig als je niet wilt dat een mislukte
-case als "blocked" in de run blijft staan.
-
-Endpoint en body volgens dezelfde vangst-procedure.
-
----
-
-## Welke call hoort bij welk moment in Tosca
+## Welke call hoort bij welk Tosca-moment
 
 ```
-Tosca StartUp           → 1 (lookup SCE)  → 2 (lookup CAS)
-Tosca AddToRun          → 4 (add testcase via scenario)  ← onthoudt testrun_testcase_id
-Tosca uitvoer (pass)    → 5 (update result = pass)
-Tosca uitvoer (fail)    → 5 (update result = fail, comment = error)
-Tosca setup-fout        → 6 (remove)  óf  5 (update = blocked)
+Tosca StartUp           → 1/2 (lookup)  óf  3 (create run als nog niet bestaat)
+Tosca AddToRun (per CAS)→ 4 (officieel) / 4b (UI fallback)
+Tosca uitvoer           → 5 (update result)
+Tosca rollback          → DELETE op zelfde URL als 4
 ```

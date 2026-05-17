@@ -12,89 +12,81 @@ Vanuit Tosca Tricentis, tijdens een lopende testrun in Testersuite:
 Authenticatie is door jou opgelost — dit plan beschrijft alleen de
 request-shapes (method, URL, headers, body) per call.
 
-## Twee API-werelden, één flow
+## Belangrijke vondsten uit Stoplight
 
-Testersuite heeft twee gescheiden HTTP-oppervlakken:
+- **Auth = Basic** (`Authorization: Basic <base64(user:pass)>`), niet Bearer.
+- **URL-patroon**: `https://{customer}.testersuite.nl.api.testersuite.com/{environmentId}/<resource>`.
+  De `{environmentId}` is dezelfde `1` die in de UI-URL staat (`/1/testcycle/2/...`).
+- **JSON:API** — alle requests/responses zijn `application/vnd.api+json`,
+  met de structuur `{ "data": { "type", "id", "attributes", "relationships" } }`.
+- **`POST /{env}/test-runs` bestaat officieel**. Een test run heeft van
+  zichzelf relationships `testScenarios` en `testCases` — er is dus zeer
+  waarschijnlijk een JSON:API relationship-endpoint om scenarios/cases aan
+  een bestaande run toe te voegen, zonder UI-endpoints.
 
-| Wereld | Base URL | Geschikt voor |
-|---|---|---|
-| Officiële API (Bearer) | `https://{customer}.testersuite.nl.api.testersuite.com` | **Lezen** van scenarios en testcases. Stoplight-gedocumenteerd. |
-| UI / web-app (sessie) | `https://{customer}.testersuite.nl/{customer_id}/…` | **Schrijven** naar testruns (toevoegen, resultaten). Niet publiek gedocumenteerd; bekend uit DevTools. |
+Dit zou kunnen betekenen dat we de UI-endpoints helemaal **niet nodig
+hebben**. Dat hangt af van twee Stoplight-pagina's die ik nog niet heb
+gezien — zie [open-questions.md](open-questions.md).
 
-Voor de gevraagde flow (toevoegen aan testrun + resultaat updaten) zijn de
-write-acties op dit moment alleen via de UI-wereld bekend. De Bearer-API
-biedt lookup (codes → IDs).
+## Twee API-werelden — herziene status
 
-## Stappen in de Tosca-runtime
+| Wereld | Base URL | Auth | Format | Status voor ons doel |
+|---|---|---|---|---|
+| Officiële API | `https://{customer}.testersuite.nl.api.testersuite.com` | Basic | JSON:API | Bevestigd voor lookup + test run create. Toevoegen aan run en resultaat: **misschien** ook hier, te bevestigen. |
+| UI / web-app | `https://{customer}.testersuite.nl/{customer_id}/…` | sessie | form-urlencoded | Fallback als de officiële API de write-acties niet biedt. |
 
+## Lookup SCE-code → scenario_id — herzien
+
+Er is **geen `?code=` filter** op `/test-scenarios`. Wat wel kan:
+
+- `filter[testCycle]={cycle_id}` — geeft alle scenarios binnen een
+  testcyclus, met `page[offset]` pagineren.
+- `filter[customField_*]=…` — alleen als de SCE-code als custom field
+  geconfigureerd is in jouw Testersuite-instance.
+
+Mogelijke aanpakken (volgorde van voorkeur):
+
+1. **Direct via ID:** als jouw Tosca-test al het numerieke scenario_id kent
+   (niet de SCE-code), sla de lookup over.
+2. **Custom field filter:** als SCE-code een custom field is (bv. customField19),
+   gebruik `?filter[customField19]=SCE001`.
+3. **Lijst + client-side filter:** haal `GET /test-scenarios?filter[testCycle]={cycle_id}&page[offset]=…`,
+   pagineren, en in Tosca/JSON-pad de juiste record op `code` matchen.
+
+Idem voor CAS-code → testcase_id.
+
+## Stappen in de Tosca-runtime — herzien
+
+```
 Per CAS die Tosca uitvoert:
 
-```
-[Tosca] → genereer request → [Testersuite]                tool van deze repo
-─────────────────────────────────────────────────────     ─────────────────
-1. lookup scenario  GET   ……/test-scenarios?code=SCE…     ts-builder lookup-scenario
-2. lookup testcase  GET   ……/test-scenarios/{id}/...      ts-builder lookup-testcase
-3. add to testrun   POST  …/testrun/{run_id}/add-…        ts-builder add-testcase-to-run
-4. (Tosca voert uit, krijgt pass/fail)
-5. update result    POST/PATCH …/testrun/{run_id}/…       ts-builder update-result
-```
-
-Stap 1 en 2 staan officieel beschreven (Stoplight). Stap 3 en 5 zijn de twee
-calls die we nog moeten **vastleggen via DevTools** — zie
-[devtools-capture-guide.md](devtools-capture-guide.md).
-
-## Bekende endpoints (vandaag)
-
-Uit jouw DevTools-vangst:
-
-```
-POST https://superp.testersuite.nl/1/testcycle/2/testrun/2/listtestscenariostoadd
-POST https://superp.testersuite.nl/1/testcycle/2/testrun/2/get-testscenarios-testcases-rows
+1. (optioneel) lookup scenario  GET  /{env}/test-scenarios?filter[testCycle]=…
+2. (optioneel) lookup testcase  GET  /{env}/test-scenarios/{sid}  (included testcases)
+3. add testcase to run          POST /{env}/test-runs/{run_id}/relationships/testCases
+                                  ↑ vermoedelijk officieel — bevestigen
+4. Tosca voert uit
+5. update result                PATCH /{env}/test-run-test-cases/{trtc_id}
+                                  ↑ resource-naam te bevestigen
 ```
 
-Patroon:
-
-```
-https://{customer}.testersuite.nl/{customer_id}/testcycle/{cycle_id}/testrun/{run_id}/{action}
-```
-
-Concrete waarden in jouw voorbeeld: `customer=superp`, `customer_id=1`,
-`cycle_id=2`, `run_id=2`.
-
-Beide zijn **lees**-calls (lijsten ophalen). De daadwerkelijke add- en
-update-acties zijn nog niet vastgelegd.
+Als 3 en 5 officieel bestaan in JSON:API: één auth (Basic), één format,
+geen UI-endpoints nodig. Als ze niet bestaan: fallback op
+`POST /{customer_id}/testcycle/{cycle_id}/testrun/{run_id}/<action>` met
+sessie-auth.
 
 ## Wat dit project oplevert
 
-- **`docs/`** — specificatie die je naast Tosca kunt leggen.
-- **`ts_builder/` (Python CLI)** — `python -m ts_builder <usecase> key=value …`
-  print het Tosca-klare request-blok op stdout.
-- **`index.html` (statische builder)** — zelfde, maar als formuliertje in de
-  browser, geen Python nodig.
+Onveranderd:
 
-Beide vullen placeholders in en produceren een blok met method, URL,
-headers, body en een copy-paste `curl`. Geen runtime-call, geen client —
-zodat dit project niet hoeft te weten wat jouw auth-flow is.
+- **`docs/`** — specificatie naast Tosca.
+- **`ts_builder/` (Python CLI)** — Tosca-klare request-blokken.
+- **`index.html` (statische builder)** — zelfde, browser-versie.
 
 ## Volgordeplan
 
 | Ronde | Wat | Status |
 |---|---|---|
-| 1 | Scaffold + docs met `{{TBD}}` op de write-acties | ✅ deze commit |
-| 2 | Stoplight-bodies inlezen + DevTools-vangst van add/update | ⏳ wacht op input |
-| 3 | Templates dichtschroeven, `{{TBD}}` weghalen, voorbeeld-curls validéren | — |
-| 4 | (optioneel) batch-mode in CLI: één Tosca-run = één commando | — |
-
-## Wat ik van jou nodig heb voor ronde 2
-
-Zie [open-questions.md](open-questions.md). Korte versie:
-
-1. Drie Stoplight-pagina's: paste de "Request" en "Response"-secties voor:
-   - retrieve-all test scenarios
-   - get-a-test-scenario
-   - test-scenario-test-case
-2. DevTools-vangst van twee acties in de UI:
-   - klik op **"Toevoegen"** bij een scenario/testcase in een testrun
-   - markeer een testcase als **Passed / Failed** in een testrun
-   (zie [devtools-capture-guide.md](devtools-capture-guide.md))
-3. Vocabulaire voor resultaatstatus: welke waarden mag `status` hebben?
+| 1 | Scaffold + docs met TBD | ✅ |
+| 2 | Basic auth + JSON:API + environmentId verwerkt; nieuwe usecases (create-test-run) | ✅ deze commit |
+| 3 | Stoplight: bevestig of "add scenario aan run" en "update result" officieel bestaan | ⏳ wacht op input |
+| 4 | Templates dichtschroeven, voorbeeld-curls valideren tegen jouw account | — |

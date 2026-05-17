@@ -2,26 +2,49 @@
 
 ## Twee oppervlakken
 
-| Soort | Base URL | Voorbeeld |
-|---|---|---|
-| Officiële API (Bearer) | `https://{customer}.testersuite.nl.api.testersuite.com` | `https://superp.testersuite.nl.api.testersuite.com` |
-| UI / web-app (sessie) | `https://{customer}.testersuite.nl/{customer_id}` | `https://superp.testersuite.nl/1` |
+| Soort | Base URL | Auth | Content-Type |
+|---|---|---|---|
+| Officiële API | `https://{customer}.testersuite.nl.api.testersuite.com` | Basic | `application/vnd.api+json` |
+| UI / web-app | `https://{customer}.testersuite.nl/{customer_id}` | sessie (PHPSESSID) | `application/x-www-form-urlencoded` |
 
-## Officiële API — gedocumenteerd op Stoplight
+**Auth-header officieel:** `Authorization: Basic <base64(user:pass)>`.
 
-| Endpoint | Stoplight-slug | Gebruikt voor |
-|---|---|---|
-| `GET /test-scenarios` (retrieve all) | `c8e3fae5e8e81-retrieve-all` | lijst alle SCE's, filter op `code` |
-| `GET /test-scenarios/{id}` | `154d1c8cdb722-get-a-test-scenario` | één SCE ophalen |
-| `… test-scenario-test-case` | `c65d7cb23d459-test-scenario-test-case` | testcases binnen een SCE |
-| `… test-scenario` (collection) | `273a0d26ebfde-test-scenario` | CRUD op SCE-resource |
+## Officiële API — bevestigd (uit Stoplight)
 
-Exacte paths, query-parameters en response-schemas komen uit de Stoplight-
-pagina's — die zijn gated (login-required), dus ik kan ze niet automatisch
-inlezen. Plak de relevante "Request" en "Response"-secties in
-[open-questions.md](open-questions.md#stoplight-bodies) en ik vul ze in.
+URL = `{api_base}/{environmentId}/<path>`. De `{environmentId}` is dezelfde
+`1` die in de UI-URL als eerste path-segment staat.
 
-## UI-endpoints — vastgelegd via DevTools
+| Endpoint | Method | Path | Stoplight-slug |
+|---|---|---|---|
+| Retrieve all test scenarios | GET | `/{env}/test-scenarios` | `c8e3fae5e8e81-retrieve-all` |
+| Get one test scenario | GET | `/{env}/test-scenarios/{id}` | `154d1c8cdb722-get-a-test-scenario` |
+| Test scenario ↔ test case | ? | (slug) | `c65d7cb23d459-test-scenario-test-case` |
+| Test scenario (resource) | ? | (slug) | `273a0d26ebfde-test-scenario` |
+| Create a test run | POST | `/{env}/test-runs` | `6d3ae0aeb118b-create-a-test-run` |
+
+Query-parameters op `Retrieve all`:
+
+- `filter[customField_*]` — bv. `filter[customField19]=1`
+- `filter[testCycle]` — testcyclus-id, leeg = Masterlist
+- `page[offset]` — paginering (10 per pagina)
+
+**Niet aanwezig:** `filter[code]` of `filter[name]`. Lookup op SCE-code
+gaat dus niet direct via query — zie `plan.md` voor de drie alternatieven.
+
+## Officiële API — vermoed maar onbevestigd
+
+JSON:API-conventies suggereren dat het volgende bestaat. Te bevestigen in
+Stoplight (zie open-questions.md):
+
+| Doel | Vermoede method + path |
+|---|---|
+| Voeg scenario toe aan testrun | `POST /{env}/test-runs/{runId}/relationships/testScenarios` |
+| Voeg testcase toe aan testrun | `POST /{env}/test-runs/{runId}/relationships/testCases` |
+| Vervang testcase-set van testrun | `PATCH /{env}/test-runs/{runId}/relationships/testCases` |
+| Update testcase-resultaat | `PATCH /{env}/test-run-test-cases/{trtcId}` of `…/test-runs/{runId}/test-cases/{trtcId}` |
+| Verwijder uit testrun | `DELETE` op zelfde URL |
+
+## UI-endpoints — vastgelegd (via DevTools)
 
 URL-patroon:
 
@@ -31,26 +54,26 @@ https://{customer}.testersuite.nl/{customer_id}/testcycle/{cycle_id}/testrun/{ru
 
 | Action | Method | Doel | Status |
 |---|---|---|---|
-| `listtestscenariostoadd` | POST | lijst SCE's die nog aan testrun toegevoegd kunnen worden | ✅ vangst aanwezig |
-| `get-testscenarios-testcases-rows` | POST | lijst CAS's die al in de testrun zitten, gegroepeerd per SCE | ✅ vangst aanwezig |
-| `{add-action}` | POST | losse testcase toevoegen aan testrun via scenario | ⏳ vangst nodig |
-| `{update-result-action}` | POST/PATCH | resultaat van een testcase in de testrun updaten | ⏳ vangst nodig |
+| `listtestscenariostoadd` | POST | lijst SCE's die nog toegevoegd kunnen worden | ✅ vangst aanwezig |
+| `get-testscenarios-testcases-rows` | POST | lijst CAS's al in run, per SCE | ✅ vangst aanwezig |
+| `{add-action}` | POST | testcase toevoegen | ⏳ vangst nodig — als fallback |
+| `{update-result-action}` | POST | resultaat updaten | ⏳ vangst nodig — als fallback |
 
-`Content-Type` van de UI-calls is `application/x-www-form-urlencoded`,
-geen JSON. Response is wel `application/json`.
+Content-Type van UI-calls is `application/x-www-form-urlencoded; charset=UTF-8`.
 
-Zie [devtools-capture-guide.md](devtools-capture-guide.md) voor hoe je de
-twee ⏳ vangsten maakt.
-
-## Bekende voorbeeld-IDs (uit jouw vangst)
+## Bekende voorbeeld-IDs
 
 - `customer` = `superp`
-- `customer_id` = `1`
+- `environmentId` (UI: customer_id) = `1`
 - `cycle_id` = `2`
 - `run_id` = `2`
 
-Voorbeeld-URL die werkt in jouw account:
+Voorbeeld werkende URLs:
 
 ```
+GET  https://superp.testersuite.nl.api.testersuite.com/1/test-scenarios?filter[testCycle]=2
+GET  https://superp.testersuite.nl.api.testersuite.com/1/test-scenarios/1
+POST https://superp.testersuite.nl.api.testersuite.com/1/test-runs
+
 POST https://superp.testersuite.nl/1/testcycle/2/testrun/2/listtestscenariostoadd
 ```
