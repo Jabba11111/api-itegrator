@@ -30,18 +30,30 @@ Open sub-vragen voor de PATCH:
 - Volledige lijst van toegestane `executionStatus`-IDs (`1` t/m ?) met
   bijbehorende `attributes.status`-strings.
 
-## 5. Status-vocabulaire — gedeeltelijk beantwoord
+## 5. Status-vocabulaire — vijf waarden
 
-Er zijn maar twee waarden: `ok` en `notok`.
+Uit een progress-response (`{notstarted, started, ok, notok, skipped}`):
 
-| `executionStatus.id` | `attributes.status` |
+| `attributes.status` | `executionStatus.id` |
 |---|---|
-| `4` | `"notok"` |
-| ? | `"ok"` |
+| `"notstarted"` | ? |
+| `"started"` | ? |
+| `"ok"` | ? |
+| `"notok"` | `4` |
+| `"skipped"` | ? |
 
-Eén waarde nog open: de `executionStatus.id` voor `"ok"`. Zet één case
-in de UI op "ok" en run `python3 -m ts_builder --curl get-testruntestcase
-env=1 run_id=92 trtc_id=… basic=… api_base=…` om hem te achterhalen.
+Vier ID's nog open. Achterhaal ze door per status één case in de UI op
+die waarde te zetten en daarna:
+
+```
+python3 -m ts_builder --curl get-testruntestcase env=1 run_id=92 trtc_id=<id> basic=… api_base=…
+```
+
+`relationships.executionStatus.data.id` levert het ID.
+
+(Voor Tosca's doel zijn alleen `ok` en `notok` strikt nodig — de andere
+drie zijn workflow-staten. Maar voor volledigheid van de spec is het
+fijn ze allemaal te hebben.)
 
 ## 4. SCE/CAS code → ID mapping — BEANTWOORD ✅
 

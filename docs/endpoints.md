@@ -44,16 +44,21 @@ gaat dus niet direct via query — zie `plan.md` voor de drie alternatieven.
 
 ## Status-mapping
 
-Testersuite kent slechts twee resultaten: `ok` en `notok`.
+Vijf statuswaarden, gezien in een `progress`-response van Testersuite:
+`notstarted`, `started`, `ok`, `notok`, `skipped`.
 
-| `executionStatus.id` | `attributes.status` |
+| `attributes.status` | `executionStatus.id` |
 |---|---|
-| `4` | `"notok"` |
-| ? | `"ok"` |
+| `"notstarted"` | ? |
+| `"started"` | ? |
+| `"ok"` | ? |
+| `"notok"` | `4` |
+| `"skipped"` | ? |
 
-De `id` voor `"ok"` is nog niet vastgelegd — eenvoudig te achterhalen
-door één testcase in de UI op "ok" te zetten en
-`GET /{env}/test-runs/{run}/test-cases/{trtc}` opnieuw te doen.
+Alleen `notok ↔ 4` is bevestigd via een vangst. De vier andere
+ID-mappings zijn snel te achterhalen door één case per status door te
+klikken in de UI en `GET /{env}/test-runs/{run}/test-cases/{trtc}` te
+doen — zie open-questions.
 
 ## UI-endpoints — vastgelegd (via DevTools)
 
