@@ -1,0 +1,36 @@
+{
+  "_comment": "Echte respons van GET /1/test-runs/92/test-cases/425 — gebruikt om de update-result endpoint en het status-veld af te leiden.",
+  "data": {
+    "id": "425",
+    "type": "testRunTestCase",
+    "attributes": {
+      "businessId": "CAS2",
+      "shortDescription": "Inloggen bol.com",
+      "longDescription": "inloggen bol.com",
+      "preparation": null,
+      "regression": true,
+      "createDate": "2026-05-08T00:00:00+02:00",
+      "lastUpdated": null,
+      "position": 1,
+      "status": "notok"
+    },
+    "relationships": {
+      "relatedTreeItem": { "data": null },
+      "status": { "data": { "id": "4", "type": "designStatus" } },
+      "testType": { "data": null },
+      "steps": { "data": [ { "id": "429", "type": "testRunTestCaseStep" } ] },
+      "defaultTester": { "data": null },
+      "owner": { "data": { "id": "1", "type": "user" } },
+      "attachments": { "data": [] },
+      "designStatus": { "data": { "data": { "id": "4", "type": "designStatus" } } },
+      "executionStatus": { "data": { "id": "4", "type": "testRunTestCaseStatus" } },
+      "testRun": { "data": { "id": "92", "type": "testRun" } }
+    }
+  },
+  "_observations": [
+    "attributes.status = 'notok' (string)",
+    "executionStatus.id = 4 hoort bij 'notok' (FK naar testRunTestCaseStatus)",
+    "attributes.businessId behoudt de oorspronkelijke CAS-code, ook na kopie naar de run",
+    "het canonical pad voor update is per JSON:API-conventie PATCH op zelfde URL"
+  ]
+}

@@ -32,13 +32,24 @@ Query-parameters op `Retrieve all`:
 **Niet aanwezig:** `filter[code]` of `filter[name]`. Lookup op SCE-code
 gaat dus niet direct via query — zie `plan.md` voor de drie alternatieven.
 
-## Officiële API — nog te bevestigen
+## Officiële API — pad bevestigd via vangst
 
-| Doel | Vermoede method + path | Status |
+| Doel | Method + path | Status |
 |---|---|---|
-| Voeg scenario toe aan testrun | — | **niet aanwezig** volgens user |
-| Update testcase-resultaat | `PATCH /{env}/test-runs/{runId}/test-cases/{trtcId}` of `/{env}/test-run-test-cases/{trtcId}` | TBD — Stoplight bevestigen |
-| Verwijder testcase uit testrun | `DELETE /{env}/test-runs/{runId}/test-cases/{trtcId}` | TBD |
+| Get one testRunTestCase | `GET /{env}/test-runs/{runId}/test-cases/{trtcId}` | ✅ vangst gedeeld |
+| Update testcase-resultaat | `PATCH /{env}/test-runs/{runId}/test-cases/{trtcId}` | ✅ pad zelfde URL, body-shape per JSON:API-conventie |
+| Verwijder testcase uit testrun | `DELETE /{env}/test-runs/{runId}/test-cases/{trtcId}` | vermoed (zelfde URL) |
+| Voeg scenario toe aan testrun | — | niet aanwezig officieel |
+| List testRunTestCaseStatus waarden | `GET /{env}/test-run-test-case-statuses` of via included | vermoed, TBD |
+
+## Status-mapping (uit vangst)
+
+| `executionStatus.id` | `attributes.status` |
+|---|---|
+| `4` | `"notok"` |
+| ? | `"ok"` |
+| ? | `"pending"` |
+| ? | `"blocked"` |
 
 ## UI-endpoints — vastgelegd (via DevTools)
 

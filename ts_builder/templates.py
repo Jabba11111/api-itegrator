@@ -99,11 +99,26 @@ USECASES = {
         "status": "official (geen scenario-veld in body)",
         "params": ["api_base", "env", "basic", "run_id", "testcase_id"],
     },
+    "get-testruntestcase": {
+        "title": "Get one testRunTestCase (read result)",
+        "surface": "official",
+        "method": "GET",
+        "url": "$api_base/$env/test-runs/$run_id/test-cases/$trtc_id",
+        "headers": {
+            "Authorization": "Basic $basic",
+            "Accept": "application/vnd.api+json",
+        },
+        "body": None, "body_form": None,
+        "expected_status": 200,
+        "extract": "attributes.status (string), relationships.executionStatus.data.id (FK)",
+        "status": "bevestigd (vangst gedeeld)",
+        "params": ["api_base", "env", "basic", "run_id", "trtc_id"],
+    },
     "update-result-official": {
-        "title": "Update testcase result in testrun (TBD)",
+        "title": "Update testcase result in testrun (PATCH testRunTestCase)",
         "surface": "official",
         "method": "PATCH",
-        "url": "$api_base/$env/test-run-test-cases/$trtc_id",
+        "url": "$api_base/$env/test-runs/$run_id/test-cases/$trtc_id",
         "headers": {
             "Authorization": "Basic $basic",
             "Content-Type": "application/vnd.api+json",
@@ -114,18 +129,24 @@ USECASES = {
                 "type": "testRunTestCase",
                 "id": "$trtc_id",
                 "attributes": {
-                    "status": "$status",
-                    "comment": "$comment",
-                    "durationSeconds": "$duration_seconds",
+                    "status": "$status"
                 },
+                "relationships": {
+                    "executionStatus": {
+                        "data": {
+                            "id": "$execution_status_id",
+                            "type": "testRunTestCaseStatus"
+                        }
+                    }
+                }
             }
         },
         "body_form": None,
         "expected_status": 200,
         "extract": None,
-        "status": "TBD — endpoint vermoed, Stoplight bevestigen",
-        "params": ["api_base", "env", "basic", "trtc_id",
-                   "status", "comment", "duration_seconds"],
+        "status": "endpoint-pad bevestigd; body-shape vermoed (JSON:API convention)",
+        "params": ["api_base", "env", "basic", "run_id", "trtc_id",
+                   "status", "execution_status_id"],
     },
     "list-scenarios-to-add-ui": {
         "title": "List addable scenarios (UI, captured)",

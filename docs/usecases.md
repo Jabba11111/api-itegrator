@@ -151,14 +151,15 @@ scenario_id={{scenario_id}}&testcase_id={{testcase_id}}
 
 ---
 
-## 5. Update testcase-resultaat in testrun  *(officieel — vermoed, TBD)*
+## 5. Update testcase-resultaat in testrun  *(officieel, pad bevestigd)*
 
-**Vermoede endpoint:** `PATCH {{api_base}}/{{env}}/test-run-test-cases/{{trtc_id}}`
+**Endpoint-pad:** `PATCH {{api_base}}/{{env}}/test-runs/{{run_id}}/test-cases/{{trtc_id}}`
 
-(Resource-naam en path zijn een gok op basis van JSON:API-conventies — te
-bevestigen via Stoplight.)
+Pad bevestigd via een echte respons op `GET` op dezelfde URL — zie
+[`samples/get-testruntestcase-425.json`](samples/get-testruntestcase-425.json).
+Per JSON:API-conventie is `PATCH` op dezelfde URL de update-call.
 
-**Body:**
+**Body (vermoed, JSON:API):**
 
 ```json
 {
@@ -166,15 +167,30 @@ bevestigen via Stoplight.)
     "type": "testRunTestCase",
     "id": "{{trtc_id}}",
     "attributes": {
-      "status": "{{status}}",
-      "comment": "{{comment}}",
-      "durationSeconds": {{duration_seconds}}
+      "status": "{{status}}"
+    },
+    "relationships": {
+      "executionStatus": {
+        "data": { "id": "{{execution_status_id}}", "type": "testRunTestCaseStatus" }
+      }
     }
   }
 }
 ```
 
-**Fallback (UI):** vergelijkbare structuur als 4b.
+**Statusveld — twee niveaus:**
+
+- `attributes.status` is een string. Geobserveerde waarde: `"notok"`.
+  Overige waarden vermoedelijk `"ok"`, `"pending"`, `"blocked"` —
+  bevestigen door de UI-status door te klikken en `GET` op de testcase
+  te herhalen.
+- `relationships.executionStatus.data.id` verwijst naar een
+  `testRunTestCaseStatus`-resource. `id=4` = "notok". De andere IDs zijn
+  nog onbekend.
+
+**Onzeker:** of Testersuite alleen `attributes.status` accepteert,
+alleen het FK-relationship, of beide tegelijk. Beste eerste poging:
+beide meesturen.
 
 ---
 

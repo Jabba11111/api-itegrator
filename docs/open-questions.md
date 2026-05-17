@@ -17,18 +17,30 @@ Niet Bearer. Format: `application/vnd.api+json` (JSON:API).
   met body `{ data: { relationships: { testDesignTestCase: { data: {id, type} } } } }`
 - Add test scenario aan testrun: **bestaat niet** officieel volgens jou.
 
-## 3b. Stoplight — nog te zoeken
+## 3b. Update-result pad — BEANTWOORD ✅
 
-### Update testresult
+Pad bevestigd: `/{env}/test-runs/{run_id}/test-cases/{trtc_id}`.
+GET bevestigd via vangst, PATCH op zelfde URL per JSON:API-conventie.
 
-Zoek "Update test run test case", "Set result", of `PATCH`-endpoint op
-`/test-run-test-cases/{id}` of `/test-runs/{id}/test-cases/{id}`.
-Nodig: method, path, body-structuur, toegestane `status`-waarden.
+Open sub-vragen voor de PATCH:
 
-### Test scenario test case (slug `c65d7cb23d459`)
+- Officiële Stoplight-pagina (slug)?
+- Mag `attributes.status` direct gezet worden, of moet het via de
+  `executionStatus`-relationship?
+- Volledige lijst van toegestane `executionStatus`-IDs (`1` t/m ?) met
+  bijbehorende `attributes.status`-strings.
 
-Slug uit jouw eerste paste — wat doet dit endpoint precies? Welke method
-+ path, en wat zit er in de response?
+## 5. Status-vocabulaire — gedeeltelijk beantwoord
+
+Geobserveerd: `attributes.status = "notok"` ↔ `executionStatus.id = 4`.
+
+Nog nodig: de overige `testRunTestCaseStatus`-records. Snelste manier:
+
+- Klik in de UI een testcase door naar `ok` / `blocked` / `pending` etc.
+- Run de CLI `python3 -m ts_builder --curl get-testruntestcase env=1 run_id=92 trtc_id=425 basic=…`
+- Noteer welke `executionStatus.id` bij welke string hoort.
+
+Of, als er een endpoint is: `GET /{env}/test-run-test-case-statuses`.
 
 ## 4. SCE/CAS code → ID mapping — BEANTWOORD ✅
 

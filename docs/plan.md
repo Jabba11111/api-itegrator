@@ -65,13 +65,16 @@ Per CAS die Tosca uitvoert:
 2. (optioneel) lookup testcase   GET  /{env}/test-scenarios/{scenario_id}
                                    filter included[] op type=testCase,
                                    match attributes.businessId == "CAS<nr>"
-3. add testcase to run           POST /{env}/test-runs/{run_id}/test-cases
+3. add testcase to run           POST  /{env}/test-runs/{run_id}/test-cases
                                    body: testDesignTestCase relationship  ✅ OFFICIEEL
 4. Tosca voert uit
-5. update result                 PATCH /{env}/.../{trtc_id}                ⏳ TBD
+5. update result                 PATCH /{env}/test-runs/{run_id}/test-cases/{trtc_id}
+                                   body: attributes.status + executionStatus FK  ✅ PAD
 ```
 
-Stap 3 is bevestigd officieel. Stap 5 nog niet gevonden in Stoplight.
+Stap 3 officieel bevestigd. Stap 5 pad bevestigd (zelfde URL als GET);
+body-shape per JSON:API-conventie, body wel nog te valideren tegen
+echte response.
 
 **Belangrijke vraag bij stap 3:** of het scenario-label automatisch
 verschijnt naast de toegevoegde case in de testrun-weergave (zie
