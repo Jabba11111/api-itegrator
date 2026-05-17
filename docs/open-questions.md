@@ -36,7 +36,7 @@ Uit een progress-response (`{notstarted, started, ok, notok, skipped}`):
 
 | `attributes.status` | `executionStatus.id` |
 |---|---|
-| `"notstarted"` | ? |
+| `"notstarted"` | `1` |
 | `"started"` | ? |
 | `"ok"` | ? |
 | `"notok"` | `4` |

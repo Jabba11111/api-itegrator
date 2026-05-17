@@ -49,7 +49,7 @@ Vijf statuswaarden, gezien in een `progress`-response van Testersuite:
 
 | `attributes.status` | `executionStatus.id` |
 |---|---|
-| `"notstarted"` | ? |
+| `"notstarted"` | `1` |
 | `"started"` | ? |
 | `"ok"` | ? |
 | `"notok"` | `4` |
