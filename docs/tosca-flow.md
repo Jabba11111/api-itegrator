@@ -28,7 +28,11 @@ Per CAS in de batch:
 | `TS_ENV` | `1` | constant |
 | `TS_CYCLE_ID` | `1` | per project |
 | `TS_BASIC` | `<base64(user:pass)>` | secret |
-| `TS_SESSION` | `PHPSESSID=…` | uit login (stap 2) |
+| `TS_USERNAME` | `tosca-bot` | secret |
+| `TS_PASSWORD` | `…` | secret |
+| `TS_INITIAL_SESSION` | `d28065f0d755…` | uit GET /login (stap 2a) |
+| `TS_LOGIN_CSRF` | `a2c387acf74f-…` | uit GET /login (stap 2a) |
+| `TS_SESSION` | `ca65b6b985b6c988d72d89c9dde46505` | uit POST /login (stap 2b) |
 | `TS_CSRF` | `aead7f3c6ffe-…` | uit GET edit (stap 3) |
 | `TS_FORM_META` | dict van form-veld-id → waarde | uit GET edit |
 | `TS_RUN_ID` | `93` | uit POST /test-runs (stap 1) |
@@ -68,21 +72,45 @@ Body:
 
 ## Stap 2 — Login (sessie verkrijgen)
 
-**Open punt — login-endpoint nog vast te leggen.** Drie opties:
+Twee opvolgende calls.
 
-A. **Captured login** — vang in DevTools de login-POST en mimik die.
-   Procedure: F12 → Network → F5 op login-pagina → log in → vind de
-   POST naar `/login` of `/auth/...`. Headers + payload vastleggen.
-   Response set-cookie geeft `PHPSESSID`.
+### Stap 2a — GET login-pagina (initial PHPSESSID + CSRF)
 
-B. **Service-account** — als Testersuite een SSO/API-key voor sessies
-   kent, gebruik die. Onbekend of dit bestaat.
+| Veld | Waarde |
+|---|---|
+| Method | `GET` |
+| URL | `https://{customer}.testersuite.nl/login` |
+| Header | `Accept: text/html` |
 
-C. **Handmatig** — tester logt in zijn browser in, kopieert
-   `PHPSESSID` uit DevTools → Application → Cookies, plakt het als
-   Tosca-buffer. Brittle (sessie verloopt), alleen voor PoC.
+**Uit response:**
+- `Set-Cookie: PHPSESSID=<initial>` → buffer `TS_INITIAL_SESSION`
+- HTML body bevat `<input name="csrft" value="…">` → buffer `TS_LOGIN_CSRF`
 
-Resultaat: `TS_SESSION = "PHPSESSID=<value>"`.
+### Stap 2b — POST login
+
+| Veld | Waarde |
+|---|---|
+| Method | `POST` |
+| URL | `https://{customer}.testersuite.nl/login` |
+| Header | `Cookie: PHPSESSID={TS_INITIAL_SESSION}` |
+| Header | `Content-Type: application/x-www-form-urlencoded; charset=UTF-8` |
+| Header | `Origin: https://{customer}.testersuite.nl` |
+| Header | `Referer: https://{customer}.testersuite.nl/login` |
+| Header | `X-Requested-With: XMLHttpRequest` |
+
+Body (URL-encoded):
+```
+redirect=&csrft={TS_LOGIN_CSRF}&username={TS_USERNAME}&password={TS_PASSWORD}
+```
+
+**Uit response:**
+- `200 OK` met JSON body (succes-bevestiging)
+- `Set-Cookie: PHPSESSID=<final>` → buffer **`TS_SESSION`** (deze
+  gebruiken voor alle UI-calls vanaf hier)
+- `Set-Cookie: refreshToken=<jwt>` → optioneel, voor sessie-verlenging
+
+**Bij `401` of `200` zonder PHPSESSID-cookie:** credentials fout of
+account locked.
 
 ## Stap 3 — GET edit-form (CSRF + metadata)
 
