@@ -114,13 +114,28 @@ redirect=&csrft={TS_LOGIN_CSRF}&username={TS_USERNAME}&password={TS_PASSWORD}
 ```
 
 **Uit response:**
-- `200 OK` met JSON body (succes-bevestiging)
+- `200 OK` met JSON body:
+  ```json
+  {
+    "token": "<JWT>",
+    "customerUserId": "<id>",
+    "redirect": "/1/?fromLogin=1"
+  }
+  ```
+  De JWT is voor SPA-API-calls (4u geldig); voor `/edit` is hij **niet** nodig.
 - `Set-Cookie: PHPSESSID=<final>` → buffer **`TS_SESSION`** (deze
-  gebruiken voor alle UI-calls vanaf hier)
+  gebruiken voor alle UI-calls vanaf hier — moét je expliciet hergebruiken
+  in de volgende request, anders is je sessie weer leeg)
 - `Set-Cookie: refreshToken=<jwt>` → optioneel, voor sessie-verlenging
 
 **Bij `401` of `200` zonder PHPSESSID-cookie:** credentials fout of
 account locked.
+
+**Veelgemaakte fout:** als je `GET /edit` doet zonder de nieuwe
+`PHPSESSID` mee te sturen, krijg je een HTML-response die de login-pagina
+is (herkenbaar aan `<html id="login">` en `<form action="/login">`).
+Niet de echte edit-form. Tosca's HTTP-module moet cookies tussen calls
+bewaren (cookie-jar) — anders breekt de flow stilletjes.
 
 ## Stap 3 — GET edit-form (CSRF + metadata)
 
