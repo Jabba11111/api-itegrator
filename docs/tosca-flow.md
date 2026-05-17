@@ -268,8 +268,15 @@ Body:
 
 ## Sessie- en CSRF-onderhoud
 
+- **PHPSESSID-cookie wisseling.** POST /login geeft een **nieuwe** PHPSESSID
+  via Set-Cookie. Veel HTTP-clients (waaronder Tosca's default
+  cookie-jar) overschrijven de bestaande PHPSESSID niet automatisch.
+  **Pak de nieuwe waarde expliciet uit de POST /login response-headers
+  via regex** (`PHPSESSID=([^;]+)`) en gebruik die als `Cookie:`-header
+  voor alle volgende UI-calls. Anders gebruik je de unauthenticated
+  initial sessie van GET /login → redirect naar login / 404.
 - **PHPSESSID** kan verlopen bij lange Tosca-batches. Vang `401/403`
-  af, login opnieuw, hervat.
+  (of een 404/redirect naar /login) af, login opnieuw, hervat.
 - **CSRF-token** roteert mogelijk per request. Test: doe twee opvolgende
   POSTs met dezelfde CSRF. Als de tweede `403` geeft → token roteert.
   In dat geval na elke POST opnieuw GET stap 3 voor verse CSRF.
