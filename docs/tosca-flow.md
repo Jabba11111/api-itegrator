@@ -175,12 +175,21 @@ voor de volledige mapping.
 
 ## Stap 4a — Voeg case toe (curl form-POST)
 
-**Bouw de body in een buffer** `TS_POST_BODY` als URL-encoded string. Voor
-een nieuwe case (zonder bestaande trtcs) een minimaal voorbeeld:
+**Vooraf:** je hebt een extra buffer nodig — `TS_TSTC_ID`, de id van het
+**testScenarioTestCase**-record dat de (SCE, CAS)-relatie legt. Zonder
+deze waarde geeft de server HTTP 500. Zie verderop hoe je 'm opzoekt.
+
+**Body voor een nieuwe case** (zonder bestaande trtcs):
 
 ```
-opentab=testcases&csrft={B[TS_CSRF]}&autoFillTesters=0&2={B[TS_SHORTDESC]}&3={B[TS_LONGDESC]}&5={B[TS_TESTTYPE]}&6={B[TS_TESTENV]}&7={B[TS_STATUS]}&8={B[TS_STARTDATE_DDMMYYYY]}&8={B[TS_STARTDATE_ISO]}&9={B[TS_ENDDATE_DDMMYYYY]}&9={B[TS_ENDDATE_ISO]}&12=0&13=0&testruntestscenariotestcases[]=&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][relationId]=&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][testscenarioId]={B[TS_SCE_ID]}&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][testcaseId]={B[TS_CAS_ID]}&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][testerId]=USR1&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][resetStatus]=0
+opentab=testcases&csrft={B[TS_CSRF]}&autoFillTesters=0&2={B[TS_SHORTDESC]}&3={B[TS_LONGDESC]}&5=&6=&7={B[TS_STATUS]}&12=0&8={B[TS_STARTDATE_DDMMYYYY]}&8={B[TS_STARTDATE_ISO]}&13=0&9={B[TS_ENDDATE_DDMMYYYY]}&9={B[TS_ENDDATE_ISO]}&testruntestscenariotestcases[]=&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][relationId]=&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][testscenarioTestcaseRelationIdToCopy]={B[TS_TSTC_ID]}&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][testscenarioId]={B[TS_SCE_ID]}&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][testcaseId]={B[TS_CAS_ID]}&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][productOrRequirementId]=&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][testerId]=&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][resetStatus]=0
 ```
+
+**Belangrijke verschillen met eerdere versie van deze doc:**
+- `testscenarioTestcaseRelationIdToCopy={B[TS_TSTC_ID]}` — **vereist niet-leeg**, anders 500
+- `testerId=` — **leeg laten** (NIET `USR1`); server vult default in
+- `X-Requested-With` header **WEGLATEN** (zie hieronder)
+- Veld-volgorde: `2, 3, 5, 6, 7, 12, 8, 8, 13, 9, 9` (zoals browser doet)
 
 **Arguments:**
 ```
@@ -189,13 +198,35 @@ opentab=testcases&csrft={B[TS_CSRF]}&autoFillTesters=0&2={B[TS_SHORTDESC]}&3={B[
   -H "Content-Type: application/x-www-form-urlencoded" ^
   -H "Origin: {B[TS_UI_HOST]}" ^
   -H "Referer: {B[TS_UI_HOST]}/{B[TS_ENV]}/testcycle/{B[TS_CYCLE_ID]}/testrun/{B[TS_RUN_ID]}/edit" ^
-  -H "X-Requested-With: XMLHttpRequest" ^
+  -H "Upgrade-Insecure-Requests: 1" ^
+  -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36" ^
   --data "{B[TS_POST_BODY]}" ^
   "{B[TS_UI_HOST]}/{B[TS_ENV]}/testcycle/{B[TS_CYCLE_ID]}/testrun/{B[TS_RUN_ID]}/edit"
 ```
 
-**Verify:** HTTP 302 (succes). De `Location`-header (in `ts_response.html`
-zit niets behalve een redirect) wijst naar `/{c}/testrun/{r}#testcases`.
+**NIET** een `X-Requested-With: XMLHttpRequest` header meesturen — de
+form-POST is een normale browser-submit, geen AJAX. Met die header kiest
+de server het verkeerde code-pad en geeft 500.
+
+**Verify:** HTTP 302 (succes). De `Location`-header wijst naar
+`/{c}/testrun/{r}#testcases`.
+
+### Hoe vind je TS_TSTC_ID
+
+Het testScenarioTestCase-id is de relatie-id tussen SCE en CAS op
+design-niveau. Doe in een aparte module:
+
+1. `GET {TS_API_BASE}/{TS_ENV}/test-scenarios/{TS_SCE_ID}` (officiële API, Basic auth)
+2. Parse `included[]`, zoek records met `type=="testScenarioTestCase"`
+3. Match op `relationships.testCase.data.id == TS_CAS_ID`
+4. Dat record's `id` → `TS_TSTC_ID`
+
+JSONPath:
+```
+$.included[?(@.type=='testScenarioTestCase' && @.relationships.testCase.data.id=='{B[TS_CAS_ID]}')].id
+```
+
+Voor (SCE3, CAS41) in superp gaf dit `7`.
 
 **Bij meerdere cases per run:** voeg ook alle bestaande trtcs toe in de
 body — zie [`samples/ui-edit-testrun-submit.json`](samples/ui-edit-testrun-submit.json).
