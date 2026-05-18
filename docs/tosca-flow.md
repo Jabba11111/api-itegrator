@@ -275,6 +275,18 @@ Body:
   via regex** (`PHPSESSID=([^;]+)`) en gebruik die als `Cookie:`-header
   voor alle volgende UI-calls. Anders gebruik je de unauthenticated
   initial sessie van GET /login → redirect naar login / 404.
+- **PHPSESSID alleen is niet genoeg — ook `refreshToken` meesturen.**
+  Empirisch bevestigd met curl: een GET op `/edit` met enkel PHPSESSID
+  geeft `302 → /login`. Server eist beide cookies. Extract beide na
+  POST /login:
+  ```
+  {REGEX["PHPSESSID=(?<TS_SESSION>[^;]+)"]}
+  {REGEX["refreshToken=(?<TS_REFRESH_TOKEN>[^;]+)"]}
+  ```
+  En stuur ze beide in alle UI-calls:
+  ```
+  Cookie: PHPSESSID={B[TS_SESSION]}; refreshToken={B[TS_REFRESH_TOKEN]}
+  ```
 - **PHPSESSID** kan verlopen bij lange Tosca-batches. Vang `401/403`
   (of een 404/redirect naar /login) af, login opnieuw, hervat.
 - **CSRF-token** roteert mogelijk per request. Test: doe twee opvolgende
