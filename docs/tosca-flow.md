@@ -1,22 +1,35 @@
-# Tosca-flow — hybride (Model C)
+# Tosca-flow — hybride (Model C) met curl voor UI-calls
 
 Tosca maakt elke keer een nieuwe testrun, voegt sequentieel cases met
-scenario toe, en schrijft daarna het resultaat weg. Mix van officiële
-API (Basic auth) en UI-form-POST (sessie-auth).
+scenario toe, en schrijft daarna het resultaat weg. **Officiële API**-
+calls gaan via Tosca's HTTP-module (eenvoudig, JSON:API, Basic auth).
+**UI-calls** gaan via **`curl.exe`** in Tosca's CLI Engine — dat
+voorkomt al het cookie-jar/PHPSESSID-gedoe.
+
+## Waarom curl voor de UI-calls
+
+- Curl beheert cookies correct via `-c <jar>` (write) + `-b <jar>` (read).
+  Geen losse PHPSESSID/refreshToken-extracties nodig — curl houdt ze
+  automatisch bij in `jar.txt`.
+- Geen redirect-verwarring: `curl` zonder `-L` volgt geen 302's, je
+  ziet exact wat de server doet.
+- Response in een file → parsen met je standaard Tosca regex-modules.
+- 1-op-1 herhaalbaar buiten Tosca (cmd / PowerShell): debug ideaal.
 
 ## Hoog-over
 
 ```
 Eenmalig per Tosca-batch:
-  1.  POST   {api}/{env}/test-runs                     (officieel, Basic)
-  2.  Login → krijg PHPSESSID                          (UI, eenmalig)
-  3.  GET    {ui}/testcycle/{c}/testrun/{r}/edit       (UI, parse CSRF + metadata)
+  1.  POST /test-runs                                  Tosca HTTP-module (Basic)
+  2a. GET /login                            curl       → CSRF, init session in jar.txt
+  2b. POST /login                           curl -b -c → final session in jar.txt
+  3.  GET /testcycle/{c}/testrun/{r}/edit   curl -b -c → CSRF + form-meta
 
 Per CAS in de batch:
-  4a. POST   {ui}/testcycle/{c}/testrun/{r}/edit       (UI, voeg entry toe)
-  4b. GET    {ui}/papi/testscenario/RUN{r}/testcases   (UI, vind nieuwe trtc_id)
-  4c. (Tosca voert eigenlijke test uit)
-  4d. PATCH  {api}/{env}/test-runs/{r}/test-cases/{trtc}  (officieel, Basic)
+  4a. POST /testcycle/{c}/testrun/{r}/edit  curl -b -c → save form
+  4b. GET /papi/testscenario/RUN{r}/testcases  curl -b → vind nieuwe trtc_id
+  4c. (Tosca eigen test)
+  4d. PATCH /test-runs/{r}/test-cases/{trtc}           Tosca HTTP-module (Basic)
 ```
 
 ## Globale buffers
@@ -24,31 +37,46 @@ Per CAS in de batch:
 | Buffer | Voorbeeld | Bron |
 |---|---|---|
 | `TS_API_BASE` | `https://superp.testersuite.nl.api.testersuite.com` | constant |
-| `TS_UI_BASE` | `https://superp.testersuite.nl/1` | constant |
+| `TS_UI_HOST` | `https://superp.testersuite.nl` | constant |
 | `TS_ENV` | `1` | constant |
 | `TS_CYCLE_ID` | `1` | per project |
 | `TS_BASIC` | `<base64(user:pass)>` | secret |
 | `TS_USERNAME` | `tosca-bot` | secret |
 | `TS_PASSWORD` | `…` | secret |
-| `TS_INITIAL_SESSION` | `d28065f0d755…` | uit GET /login (stap 2a) |
-| `TS_LOGIN_CSRF` | `a2c387acf74f-…` | uit GET /login (stap 2a) |
-| `TS_SESSION` | `ca65b6b985b6c988d72d89c9dde46505` | uit POST /login (stap 2b) |
-| `TS_CSRF` | `aead7f3c6ffe-…` | uit GET edit (stap 3) |
-| `TS_FORM_META` | dict van form-veld-id → waarde | uit GET edit |
-| `TS_RUN_ID` | `93` | uit POST /test-runs (stap 1) |
+| `TS_JAR` | `%TEMP%\ts_jar.txt` | constant (cookie-jar pad) |
+| `TS_TMP` | `%TEMP%\ts_response.html` | constant (response-pad) |
+| `TS_LOGIN_CSRF` | `94d0abb8b308-…` | uit GET /login (stap 2a) |
+| `TS_CSRF` | `da382d005781-…` | uit GET /edit (stap 3) |
+| `TS_RUN_ID` | `97` | uit POST /test-runs (stap 1) |
+| `TS_HTTP_STATUS` | `200` | uit elke curl-call (`-w "%{http_code}"`) |
 | `TS_OK_STATUS_ID` | `?` (te bepalen) | constant |
 | `TS_NOTOK_STATUS_ID` | `4` | constant |
 
-## Stap 1 — Create test run (officieel)
+## Curl-aanroep template (CLI Engine in Tosca)
 
-`POST {TS_API_BASE}/{TS_ENV}/test-runs`
+In Tosca's **TBox CLI Engine** module configuratie:
 
-Headers:
-```
-Authorization: Basic {TS_BASIC}
-Content-Type: application/vnd.api+json
-Accept: application/vnd.api+json
-```
+| Veld | Waarde |
+|---|---|
+| Application | `C:\Windows\System32\curl.exe` (Windows 10+ standaard) |
+| Arguments | zie per stap hieronder |
+| Working Directory | `%TEMP%` |
+| Wait For Exit | `true` |
+| Capture stdout | `true` → naar buffer `TS_HTTP_STATUS` |
+
+Tosca stuurt `%TEMP%` automatisch door als environment variable.
+
+---
+
+## Stap 1 — Create test run (Tosca HTTP-module, officieel)
+
+| Veld | Waarde |
+|---|---|
+| Method | `POST` |
+| URL | `{B[TS_API_BASE]}/{B[TS_ENV]}/test-runs` |
+| Header | `Authorization: Basic {B[TS_BASIC]}` |
+| Header | `Content-Type: application/vnd.api+json` |
+| Header | `Accept: application/vnd.api+json` |
 
 Body:
 ```json
@@ -62,239 +90,193 @@ Body:
       "endDate": "{{today}}"
     },
     "relationships": {
-      "testCycle": { "data": { "id": "{TS_CYCLE_ID}", "type": "testCycle" } }
+      "testCycle": { "data": { "id": "{B[TS_CYCLE_ID]}", "type": "testCycle" } }
     }
   }
 }
 ```
 
-**Buffer:** `data.id` → `TS_RUN_ID`.
+**Verify:** HTTP 201, buffer `data.id` → `TS_RUN_ID`.
 
-## Stap 2 — Login (sessie verkrijgen)
+---
 
-Twee opvolgende calls.
+## Stap 2a — GET login (curl, init cookie-jar)
 
-### Stap 2a — GET login-pagina (initial PHPSESSID + CSRF)
-
-| Veld | Waarde |
-|---|---|
-| Method | `GET` |
-| URL | `https://{customer}.testersuite.nl/login` |
-| Header | `Accept: text/html` |
-
-**Uit response:**
-- `Set-Cookie: PHPSESSID=<initial>` → buffer `TS_INITIAL_SESSION`
-- HTML body bevat een `<form id="loginform">` met o.a.:
-  ```html
-  <input type="hidden" name="redirect" value="..." />
-  <input type="hidden" name="csrft" value="94d0abb8b308-9cee6b7f98fda603b378b5c3d66f55c94aa78df3" />
-  ```
-  → parse de `csrft` value naar buffer `TS_LOGIN_CSRF`.
-
-**Tosca-extractie:**
-
-- Regex (response body): `name="csrft"\s+value="([^"]+)"`
-- Of XPath als Tosca HTML-parsing ondersteunt: `//input[@name='csrft']/@value`
-
-### Stap 2b — POST login
-
-| Veld | Waarde |
-|---|---|
-| Method | `POST` |
-| URL | `https://{customer}.testersuite.nl/login` |
-| Header | `Cookie: PHPSESSID={TS_INITIAL_SESSION}` |
-| Header | `Content-Type: application/x-www-form-urlencoded; charset=UTF-8` |
-| Header | `Origin: https://{customer}.testersuite.nl` |
-| Header | `Referer: https://{customer}.testersuite.nl/login` |
-| Header | `X-Requested-With: XMLHttpRequest` |
-
-Body (URL-encoded):
+**Arguments:**
 ```
-redirect=&csrft={TS_LOGIN_CSRF}&username={TS_USERNAME}&password={TS_PASSWORD}
+-s -c "{B[TS_JAR]}" -o "{B[TS_TMP]}" -w "%{http_code}" "{B[TS_UI_HOST]}/login"
 ```
 
-**Uit response:**
-- `200 OK` met JSON body:
-  ```json
-  {
-    "token": "<JWT>",
-    "customerUserId": "<id>",
-    "redirect": "/1/?fromLogin=1"
-  }
-  ```
-  De JWT is voor SPA-API-calls (4u geldig); voor `/edit` is hij **niet** nodig.
-- `Set-Cookie: PHPSESSID=<final>` → buffer **`TS_SESSION`** (deze
-  gebruiken voor alle UI-calls vanaf hier — moét je expliciet hergebruiken
-  in de volgende request, anders is je sessie weer leeg)
-- `Set-Cookie: refreshToken=<jwt>` → optioneel, voor sessie-verlenging
+Resultaat:
+- `jar.txt` bevat de initial PHPSESSID
+- `ts_response.html` bevat de login-pagina HTML
+- stdout = HTTP-code (200 verwacht) → buffer `TS_HTTP_STATUS`
 
-**Bij `401` of `200` zonder PHPSESSID-cookie:** credentials fout of
-account locked.
+**Vervolgmodule — parse CSRF uit `ts_response.html`:**
 
-**Veelgemaakte fout:** als je `GET /edit` doet zonder de nieuwe
-`PHPSESSID` mee te sturen, krijg je een HTML-response die de login-pagina
-is (herkenbaar aan `<html id="login">` en `<form action="/login">`).
-Niet de echte edit-form. Tosca's HTTP-module moet cookies tussen calls
-bewaren (cookie-jar) — anders breekt de flow stilletjes.
-
-## Stap 3 — GET edit-form (CSRF + metadata)
-
-`GET {TS_UI_BASE}/testcycle/{TS_CYCLE_ID}/testrun/{TS_RUN_ID}/edit`
-
-Headers:
+Tosca Read File of File-Module → buffer regex:
 ```
-Cookie: {TS_SESSION}
-Accept: text/html
+{REGEX["name=\x22csrft\x22\s+value=\x22(?<TS_LOGIN_CSRF>[^\x22]+)\x22"]}
 ```
 
-**Parse uit HTML** (de meest betrouwbare aanpak: parse altijd, hardcode niet,
-want veldnamen zijn tenant-specifieke custom-fieldIDs):
+---
 
-- `<input name="csrft" value="…">` → `TS_CSRF`
-- `<input name="2" value="…">` → shortDescription (de echte HTML-naam kan
-  per tenant anders zijn, in superp is het `name="2"`)
-- `<textarea name="3">…</textarea>` → longDescription
-- `<select name="5">` → testtype id (optioneel)
-- `<select name="6">` → testenvironment id (optioneel)
-- `<select name="7">` → status id (`1=notstarted`, `3=canceled`, `4=finished`)
-- `<input name="8">` × 2 → startDate (dd/mm/yyyy + yyyy-mm-dd)
-- `<input name="9">` × 2 → endDate (idem)
-- `<input name="12">` × 2 → isSequential (hidden `0` + checkbox `1`)
-- `<input name="13">` × 2 → executeBeforeStartDateAllowed
-- `<input name="autoFillTesters">` → bv `"0"`
+## Stap 2b — POST login (curl, finale session in jar.txt)
 
-Sla de **complete waarden-set** op als `TS_FORM_META` — bij de POST in
-stap 4a stuur je deze ongewijzigd terug.
-
-**Volledige veld-referentie:** [`samples/get-edit-form-fields.json`](samples/get-edit-form-fields.json)
-
-## Stap 4a — Voeg case toe (UI form-POST)
-
-`POST {TS_UI_BASE}/testcycle/{TS_CYCLE_ID}/testrun/{TS_RUN_ID}/edit`
-
-Headers:
+**Arguments:**
 ```
-Cookie: {TS_SESSION}
-Content-Type: application/x-www-form-urlencoded
-Origin: {TS_UI_BASE_ORIGIN}
-Referer: {TS_UI_BASE}/testcycle/{TS_CYCLE_ID}/testrun/{TS_RUN_ID}/edit
-X-Requested-With: XMLHttpRequest
+-s -b "{B[TS_JAR]}" -c "{B[TS_JAR]}" -o "{B[TS_TMP]}" -w "%{http_code}" ^
+  -X POST ^
+  -H "Content-Type: application/x-www-form-urlencoded" ^
+  --data-urlencode "redirect=" ^
+  --data-urlencode "csrft={B[TS_LOGIN_CSRF]}" ^
+  --data-urlencode "username={B[TS_USERNAME]}" ^
+  --data-urlencode "password={B[TS_PASSWORD]}" ^
+  "{B[TS_UI_HOST]}/login"
 ```
 
-Body (URL-encoded), opgebouwd als:
+Curl schrijft de nieuwe PHPSESSID + refreshToken in `jar.txt` automatisch
+omdat `-b` én `-c` op hetzelfde pad staan.
 
+**Verify:** HTTP 200. Negeer de JSON-body (bevat JWT die we niet nodig hebben).
+
+**Bij `401`:** credentials fout, stop run.
+
+---
+
+## Stap 3 — GET edit-form (curl)
+
+**Arguments:**
 ```
-<alle key=value uit TS_FORM_META>
-&csrft={TS_CSRF}
-&testruntestscenariotestcases[]=
-<voor elke al toegevoegde trtc uit eerdere iteraties:>
-&testruntestscenariotestcases[<trtc_id>][relationId]=<trtc_id>
-&testruntestscenariotestcases[<trtc_id>][testscenarioTestcaseRelationIdToCopy]=
-&testruntestscenariotestcases[<trtc_id>][testscenarioId]=<design SCE-id of leeg>
-&testruntestscenariotestcases[<trtc_id>][testcaseId]=<design CAS-id>
-&testruntestscenariotestcases[<trtc_id>][productOrRequirementId]=
-&testruntestscenariotestcases[<trtc_id>][testerId]=USR1
-&testruntestscenariotestcases[<trtc_id>][resetStatus]=0
-<voor de NIEUWE case (genereer een nieuwe random key):>
-&testruntestscenariotestcases[new__<rand>][relationId]=
-&testruntestscenariotestcases[new__<rand>][testscenarioId]=<design SCE-id>
-&testruntestscenariotestcases[new__<rand>][testcaseId]=<design CAS-id>
-&testruntestscenariotestcases[new__<rand>][testerId]=USR1
-&testruntestscenariotestcases[new__<rand>][resetStatus]=0
+-s -b "{B[TS_JAR]}" -c "{B[TS_JAR]}" -o "{B[TS_TMP]}" -w "%{http_code}" ^
+  "{B[TS_UI_HOST]}/{B[TS_ENV]}/testcycle/{B[TS_CYCLE_ID]}/testrun/{B[TS_RUN_ID]}/edit"
 ```
 
-**Belangrijk:**
-- Bij elke iteratie moet je **alle al bestaande trtcs** mee POSTen,
-  anders worden ze verwijderd. Tosca houdt dus een lijst `added_trtcs`
-  bij.
-- `<rand>` is een unieke hex-string (bv. eerste 12 chars van `uuid()`).
-- `testscenarioId` is de **design SCE-id** (`3` voor SCE3).
-- `testcaseId` is de **design CAS-id** (`41` voor CAS41).
+**Verify:** HTTP 200 (geen 302 — als wel 302, is je sessie kapot).
 
-**Verwacht:** `302` redirect naar `…/testrun/{r}#testcases`. Negeer de
-redirect — de save is succesvol.
+**Parse uit `ts_response.html`** (verschilt per tenant — gebruik regex
+met named groups voor elke waarde die je nodig hebt):
 
-## Stap 4b — Lookup nieuwe trtc_id
-
-`GET {TS_UI_BASE}/papi/testscenario/RUN{TS_RUN_ID}/testcases`
-
-Headers:
 ```
-Cookie: {TS_SESSION}
-X-Requested-With: XMLHttpRequest
+{REGEX["name=\x22csrft\x22\s+value=\x22(?<TS_CSRF>[^\x22]+)\x22"]}
+{REGEX["name=\x222\x22[^>]*value=\x22(?<TS_SHORTDESC>[^\x22]*)\x22"]}
+{REGEX["name=\x227\x22[^>]*>[^<]*<option[^>]*selected[^>]*value=\x22(?<TS_STATUS>[^\x22]+)\x22"]}
+... etc per veld
 ```
 
-**Parse HTML:** zoek `<tr databaseid="…" businessid="CAS<n>">`. Voor de
-zojuist toegevoegde CAS:
+Voor superp zijn de relevante velden:
+`2`=shortDesc, `3`=longDesc, `5`=testtype, `6`=testenvironment, `7`=status,
+`8`=startDate (×2), `9`=endDate (×2), `12`=isSequential, `13`=executeBeforeStartDate.
 
-- `databaseid` → de nieuwe `trtc_id`
-- Voeg deze toe aan `added_trtcs` lijst (nodig voor volgende iteratie)
+Zie [`samples/get-edit-form-fields.json`](samples/get-edit-form-fields.json)
+voor de volledige mapping.
 
-**Truc:** sorteer rijen op `databaseid` aflopend; de eerste rij met de
-juiste `businessid` is de nieuwste kopie.
+---
+
+## Stap 4a — Voeg case toe (curl form-POST)
+
+**Bouw de body in een buffer** `TS_POST_BODY` als URL-encoded string. Voor
+een nieuwe case (zonder bestaande trtcs) een minimaal voorbeeld:
+
+```
+opentab=testcases&csrft={B[TS_CSRF]}&autoFillTesters=0&2={B[TS_SHORTDESC]}&3={B[TS_LONGDESC]}&5={B[TS_TESTTYPE]}&6={B[TS_TESTENV]}&7={B[TS_STATUS]}&8={B[TS_STARTDATE_DDMMYYYY]}&8={B[TS_STARTDATE_ISO]}&9={B[TS_ENDDATE_DDMMYYYY]}&9={B[TS_ENDDATE_ISO]}&12=0&13=0&testruntestscenariotestcases[]=&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][relationId]=&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][testscenarioId]={B[TS_SCE_ID]}&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][testcaseId]={B[TS_CAS_ID]}&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][testerId]=USR1&testruntestscenariotestcases[new__{B[TS_NEWKEY]}][resetStatus]=0
+```
+
+**Arguments:**
+```
+-s -b "{B[TS_JAR]}" -c "{B[TS_JAR]}" -o "{B[TS_TMP]}" -w "%{http_code}" ^
+  -X POST ^
+  -H "Content-Type: application/x-www-form-urlencoded" ^
+  -H "Origin: {B[TS_UI_HOST]}" ^
+  -H "Referer: {B[TS_UI_HOST]}/{B[TS_ENV]}/testcycle/{B[TS_CYCLE_ID]}/testrun/{B[TS_RUN_ID]}/edit" ^
+  -H "X-Requested-With: XMLHttpRequest" ^
+  --data "{B[TS_POST_BODY]}" ^
+  "{B[TS_UI_HOST]}/{B[TS_ENV]}/testcycle/{B[TS_CYCLE_ID]}/testrun/{B[TS_RUN_ID]}/edit"
+```
+
+**Verify:** HTTP 302 (succes). De `Location`-header (in `ts_response.html`
+zit niets behalve een redirect) wijst naar `/{c}/testrun/{r}#testcases`.
+
+**Bij meerdere cases per run:** voeg ook alle bestaande trtcs toe in de
+body — zie [`samples/ui-edit-testrun-submit.json`](samples/ui-edit-testrun-submit.json).
+Tosca houdt een lijst `added_trtcs` bij en bouwt de body per iteratie op.
+
+`{B[TS_NEWKEY]}` = elke unieke hex-string per case, bv. via
+`{RANDOMREGEX["^[a-f0-9]{12}$"]}`.
+
+---
+
+## Stap 4b — Lookup nieuwe trtc_id (curl)
+
+**Arguments:**
+```
+-s -b "{B[TS_JAR]}" -o "{B[TS_TMP]}" -w "%{http_code}" ^
+  "{B[TS_UI_HOST]}/{B[TS_ENV]}/papi/testscenario/RUN{B[TS_RUN_ID]}/testcases"
+```
+
+**Parse uit `ts_response.html`** — zoek de regel met de CAS-code die je
+net toevoegde, en de hoogste `databaseid` (= nieuwste):
+
+```
+{REGEX["<tr\s+databaseid=\x22(?<TS_TRTC_ID>\d+)\x22[^>]*businessid=\x22{B[TS_CAS_CODE]}\x22"]}
+```
+
+Voeg `TS_TRTC_ID` toe aan de lijst `added_trtcs` voor de volgende iteratie.
+
+---
 
 ## Stap 4c — Tosca eigen test
 
 Voer de geautomatiseerde acties uit. Aan het einde:
 - `TOSCA_RESULT` = `"ok"` of `"notok"`
-- `EXEC_STATUS_ID` = `{TS_OK_STATUS_ID}` of `{TS_NOTOK_STATUS_ID}`
+- `EXEC_STATUS_ID` = `{B[TS_OK_STATUS_ID]}` of `{B[TS_NOTOK_STATUS_ID]}`
 
-## Stap 4d — PATCH resultaat (officieel)
+---
 
-`PATCH {TS_API_BASE}/{TS_ENV}/test-runs/{TS_RUN_ID}/test-cases/{trtc_id}`
+## Stap 4d — PATCH resultaat (Tosca HTTP-module, officieel)
 
-Headers:
-```
-Authorization: Basic {TS_BASIC}
-Content-Type: application/vnd.api+json
-Accept: application/vnd.api+json
-```
+| Veld | Waarde |
+|---|---|
+| Method | `PATCH` |
+| URL | `{B[TS_API_BASE]}/{B[TS_ENV]}/test-runs/{B[TS_RUN_ID]}/test-cases/{B[TS_TRTC_ID]}` |
+| Header | `Authorization: Basic {B[TS_BASIC]}` |
+| Header | `Content-Type: application/vnd.api+json` |
+| Header | `Accept: application/vnd.api+json` |
 
 Body:
 ```json
 {
   "data": {
     "type": "testRunTestCase",
-    "id": "{trtc_id}",
-    "attributes": { "status": "{TOSCA_RESULT}" },
+    "id": "{B[TS_TRTC_ID]}",
+    "attributes": { "status": "{B[TOSCA_RESULT]}" },
     "relationships": {
       "executionStatus": {
-        "data": { "id": "{EXEC_STATUS_ID}", "type": "testRunTestCaseStatus" }
+        "data": { "id": "{B[EXEC_STATUS_ID]}", "type": "testRunTestCaseStatus" }
       }
     }
   }
 }
 ```
 
+**Verify:** HTTP 200.
+
+---
+
 ## Sessie- en CSRF-onderhoud
 
-- **PHPSESSID-cookie wisseling.** POST /login geeft een **nieuwe** PHPSESSID
-  via Set-Cookie. Veel HTTP-clients (waaronder Tosca's default
-  cookie-jar) overschrijven de bestaande PHPSESSID niet automatisch.
-  **Pak de nieuwe waarde expliciet uit de POST /login response-headers
-  via regex** (`PHPSESSID=([^;]+)`) en gebruik die als `Cookie:`-header
-  voor alle volgende UI-calls. Anders gebruik je de unauthenticated
-  initial sessie van GET /login → redirect naar login / 404.
-- **PHPSESSID alleen is niet genoeg — ook `refreshToken` meesturen.**
-  Empirisch bevestigd met curl: een GET op `/edit` met enkel PHPSESSID
-  geeft `302 → /login`. Server eist beide cookies. Extract beide na
-  POST /login:
-  ```
-  {REGEX["PHPSESSID=(?<TS_SESSION>[^;]+)"]}
-  {REGEX["refreshToken=(?<TS_REFRESH_TOKEN>[^;]+)"]}
-  ```
-  En stuur ze beide in alle UI-calls:
-  ```
-  Cookie: PHPSESSID={B[TS_SESSION]}; refreshToken={B[TS_REFRESH_TOKEN]}
-  ```
-- **PHPSESSID** kan verlopen bij lange Tosca-batches. Vang `401/403`
-  (of een 404/redirect naar /login) af, login opnieuw, hervat.
-- **CSRF-token** roteert mogelijk per request. Test: doe twee opvolgende
-  POSTs met dezelfde CSRF. Als de tweede `403` geeft → token roteert.
-  In dat geval na elke POST opnieuw GET stap 3 voor verse CSRF.
-  Verwachting: CSRF blijft geldig binnen één sessie, maar bevestigen.
-- **Form-state** groeit per case. Voor 100 cases is de laatste POST
-  ~15KB body — geen probleem.
+- **Cookie-jar via curl** elimineert PHPSESSID/refreshToken-gedoe — beide
+  cookies worden automatisch beheerd in `jar.txt` zolang je `-b` én `-c`
+  consistent gebruikt.
+- **Sessie verloopt** bij lange Tosca-batches (typisch 1u inactiviteit).
+  Vang HTTP 302/401/404 op stap 3+ af, herhaal stap 2a/2b voor een
+  verse sessie, hervat.
+- **CSRF-token** roteert mogelijk per request. Veilig is: na elke
+  succesvolle stap 4a opnieuw stap 3 doen om verse CSRF op te halen.
+  Snel testen: doe 2× achter elkaar 4a met dezelfde CSRF — als de 2e
+  403 geeft, roteert hij.
+- **Form-state groeit** per case. Voor 100 cases is de POST-body ~15KB,
+  ruim binnen wat curl en de server aankunnen.
 
 ## Vier ID-ruimtes (verwar ze niet)
 
@@ -324,9 +306,22 @@ Voor Tosca's PATCH: alleen `ok` (id `?`) en `notok` (id `4`) relevant.
 | HTTP-code | Betekenis | Actie |
 |---|---|---|
 | `200/201` | OK | door |
-| `302` | redirect na form-submit | succes, volg location niet |
+| `302` | redirect na form-submit (4a) | succes |
+| `302` | redirect bij GET (3, 4b) | sessie kapot → re-login |
 | `400` | bad request | log body, stop |
 | `401/403` | auth / sessie / CSRF verlopen | re-login + verse CSRF, retry |
 | `404` | resource niet gevonden | check ID-soort, log, markeer skipped |
 | `409` | conflict | check duplicaten |
 | `5xx` | server fout | retry 2× met backoff (2s, 4s) |
+
+## Debug-tips
+
+- Voeg tijdelijk `-v` toe aan curl-arguments voor verbose output. Zie
+  precies welke headers verzonden/ontvangen worden.
+- `type %TEMP%\ts_response.html` in cmd om de response in te zien na een
+  Tosca-run.
+- `type %TEMP%\ts_jar.txt` om te zien welke cookies curl heeft. Format:
+  Netscape cookie file (`domain TAB hostonly TAB path ...`).
+- Bij twijfel: doe dezelfde curl-call buiten Tosca in cmd. Werkt het
+  daar? Dan ligt het probleem in Tosca's argument-escaping, niet in
+  de call zelf.
